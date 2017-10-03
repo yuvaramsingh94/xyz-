@@ -66,7 +66,21 @@ Total params: 75,491
 Trainable params: 74,275
 Non-trainable params: 1,216
  
- 
+
+#### Encoder block
+
+each Encoder block consist of seperable convolution layer fitted with batch normalizar which normalize the output of one layer and sends that to the next layer . this normalization helps in creating sub neural net and improves the training time . also it allowes for hight learning rate which will come in handy if you try to train the model for higher epoch . seperable conv2D is used to reduce the total number of parameters to train the system . 
+
+#### Decoder block
+
+Decoder block consist of bilinear up-sampling layer , concatenation and a seperable conv2d layer fitted wiht batch normalization . the up-sampling layer uses weighter resampling technique to increase the dimension of the input .
+
+P12 = P1 + W1*(P2 - P1)/W2  
+
+this is the formula by which the up sampler increases the dimentions 
+
+
+
 
 
  
