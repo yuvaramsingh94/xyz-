@@ -103,7 +103,8 @@ i trainied my model over 4100+training data and 1500+ validation data . this for
 
 ### limitations 
 
-* A descent GPU is required to run a inference of my model . this is the current bottle neck 
+* A descent GPU is required to run a inference of my model . this makes it hard to impliment this model in a small drone which should relay on a GPU server to process the live feeds
+* The model is trained only on 3 labels so the pixel classification is limited to those 3 labels . to use this model for a much wider classification problem , retraining or transfer learning is required
 
 
 
