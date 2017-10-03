@@ -1,6 +1,4 @@
-# Follow me project
 
-## About Project Follow me
 
 This is the last project of udacity's Robotics Nanodegree term 1, where we get to play wiht Neural network concepts like Deep neural networks ,convolutional neural networks and semantic segmentation . this project implements semantic segmmentation to train a model for detecting and locating our hero in a croweded city environment and make our quad follow her . through this project we can see the practical implimentation of semantic segmentation  
 
@@ -83,7 +81,26 @@ after upsampling , the result is concatenated with a layer from encoder which ha
 
 #### 1x1 convolution layer 
 
-1x1 conv is a way of retaining the spacial information which will be losed if we use flattened connected layer . this is 
+1x1 conv is a way of retaining the spacial information which will be loosed if we use fully connected layer . this is 
+
+#### final architecture
+
+as you can see in the model.summery() output provided above , i have used 32,64,128 as filter size for the encoder and reconstructed them using the same filter size and used three skip connections . final layer output shape is same as the input provided (160,160,3). 
+
+### Hyper parameter 
+
+######my parameters used 
+
+* Epoch = 30
+* Batch size = 16 (can be changed )
+* steps per epoch = 280 (i used 4100+ training data )
+* validation_steps = 50
+* workers = 2
+* learning rate = 0.01
+* optimizer = Adam optimizer
+
+
+
 
 
 
