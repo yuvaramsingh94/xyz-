@@ -79,7 +79,11 @@ P12 = P1 + W1*(P2 - P1)/W2
 
 this is the formula by which the up sampler increases the dimentions 
 
+after upsampling , the result is concatenated with a layer from encoder which has the same dimention . this technique is called skip connection which helps in retaining the useful information . a seperable conv2D layer is added to the end of the skipconnection . this conv2d layer uses stride value of 1 so there is not change in the dimentionality 
 
+#### 1x1 convolution layer 
+
+1x1 conv is a way of retaining the spacial information which will be losed if we use flattened connected layer . this is 
 
 
 
