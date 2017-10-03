@@ -9,6 +9,7 @@ This is the last project of udacity's Robotics Nanodegree term 1, where we get t
 
 ### Network architecture 
 <image of the network graph>
+ 
  ''' 
  
  Layer (type)                 Output Shape              Param #   
