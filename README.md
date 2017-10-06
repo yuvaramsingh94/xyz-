@@ -57,7 +57,7 @@ as you can see in the model.summery() output provided above , i have used 32,64,
 * optimizer = Adam optimizer
 * passes per batch = 30 X 280 = 8400
 
-i trainied my model over 4100+training data and 1500+ validation data . this forced me to run the training session for a more epochs . i setteled on 30 epochs because it gave me a good ourput and after that the validation loss started to oscillate up and down . my GPU suffered from low memory and this is the reason i choose a low batch size 16 so i can train my model without crashing my system . this can always be changed based on the hardware . to speed up the convergence process , i choose a learning rate of 0.01 after trying our seeral rates like 0.001,0.005 etc . this rate seems to work good for me at the training data i collected 
+i trainied my model over 4100+training data and 1500+ validation data . this forced me to run the training session for a more epochs . i setteled on 30 epochs because it gave me a good ourput and after that the validation loss started to oscillate up and down . my GPU suffered from low memory and this is the reason i choose a low batch size 16 so i can train my model without crashing my system . this can always be changed based on the hardware . to speed up the convergence process , i choose a learning rate of 0.01 after trying our several rates like 0.001,0.005 etc . this rate seems to work good for me on the training data i collected 
 
 ### limitations 
 
