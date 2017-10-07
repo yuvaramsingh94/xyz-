@@ -61,6 +61,7 @@ i trainied my model over 4100+training data and 1500+ validation data . this for
 
 ### limitations 
 
+* my detections have black spots in it due to the lack of activation . this can be avoided by training the model for few more epoch and also increasing the dataset can help this 
 * A descent GPU is required to run a inference of my model . this makes it hard to impliment this model in a small drone which should relay on a GPU server to process the live feeds
 * The model is trained only on 3 labels so the pixel classification is limited to those 3 labels . to use this model for a much wider classification problem , retraining or transfer learning is required
 * few miss clasification of environment pixels can be seen . the main cause for this is the similarities on the color of hte building and the people . this can also be avoided by using more data 
