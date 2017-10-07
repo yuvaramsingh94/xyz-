@@ -38,7 +38,7 @@ after upsampling , the result is concatenated with a layer from encoder which ha
 
 #### 1x1 convolution layer 
 
-1x1 conv is a way of retaining the spacial information which will be loosed if we use fully connected layer . this is 
+1x1 conv is a way of retaining the spacial information which will be loosed if we use fully connected layer . fundamentally it is same as the convolution 2d layer with same padding , stride of 1 and 1x1 kernal .  this provides an advantage of using different size image as the input since we dont have a fixed number of nuerons as teh fully connected layer
 
 #### final architecture
 
