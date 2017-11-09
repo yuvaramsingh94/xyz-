@@ -1,77 +1,101 @@
+[![Udacity - Robotics NanoDegree Program](https://s3-us-west-1.amazonaws.com/udacity-robotics/Extra+Images/RoboND_flag.png)](https://www.udacity.com/robotics)
+# Robotic arm - Pick & Place project
 
+Make sure you are using robo-nd VM or have Ubuntu+ROS installed locally.
 
-[//]: # (Image References)
+### One time Gazebo setup step:
+Check the version of gazebo installed on your system using a terminal:
+```sh
+$ gazebo --version
+```
+To run projects from this repository you need version 7.7.0+
+If your gazebo version is not 7.7.0+, perform the update as follows:
+```sh
+$ sudo sh -c 'echo "deb http://packages.osrfoundation.org/gazebo/ubuntu-stable `lsb_release -cs` main" > /etc/apt/sources.list.d/gazebo-stable.list'
+$ wget http://packages.osrfoundation.org/gazebo.key -O - | sudo apt-key add -
+$ sudo apt-get update
+$ sudo apt-get install gazebo7
+```
 
-[image1]: ./img/evaluation.png "evaluation"
-[image2]: ./img/final_score.png "score"
-[image3]: ./img/prediction_1.png "pred 1"
-[image4]: ./img/prediction_2.png "pred 2"
-[image5]: ./img/main_model_with_shapes.png "model"
+Once again check if the correct version was installed:
+```sh
+$ gazebo --version
+```
+### For the rest of this setup, catkin_ws is the name of active ROS Workspace, if your workspace name is different, change the commands accordingly
 
-![alt text][image4]
+If you do not have an active ROS workspace, you can create one by:
+```sh
+$ mkdir -p ~/catkin_ws/src
+$ cd ~/catkin_ws/
+$ catkin_make
+```
 
-This is the last project of udacity's Robotics Nanodegree term 1, where we get to play wiht Neural network concepts like Deep neural networks ,convolutional neural networks and semantic segmentation . this project implements semantic segmmentation to train a model for detecting and locating our hero in a croweded city environment and make our quad follow her . through this project we can see the practical implimentation of semantic segmentation  
+Now that you have a workspace, clone or download this repo into the **src** directory of your workspace:
+```sh
+$ cd ~/catkin_ws/src
+$ git clone https://github.com/udacity/RoboND-Kinematics-Project.git
+```
 
+Now from a terminal window:
 
-## Rubrics explination 
+```sh
+$ cd ~/catkin_ws
+$ rosdep install --from-paths src --ignore-src --rosdistro=kinetic -y
+$ cd ~/catkin_ws/src/RoboND-Kinematics-Project/kuka_arm/scripts
+$ sudo chmod +x target_spawn.py
+$ sudo chmod +x IK_server.py
+$ sudo chmod +x safe_spawner.sh
+```
+Build the project:
+```sh
+$ cd ~/catkin_ws
+$ catkin_make
+```
 
-### Network architecture 
-<image of the network graph>
- 
- ![alt text][image5]
- 
+Add following to your .bashrc file
+```
+export GAZEBO_MODEL_PATH=~/catkin_ws/src/RoboND-Kinematics-Project/kuka_arm/models
 
+source ~/catkin_ws/devel/setup.bash
+```
 
-#### Encoder block
+For demo mode make sure the **demo** flag is set to _"true"_ in `inverse_kinematics.launch` file under /RoboND-Kinematics-Project/kuka_arm/launch
 
-each Encoder block consist of seperable convolution layer fitted with batch normalizar which normalize the output of one layer and sends that to the next layer . this normalization helps in creating sub neural net and improves the training time . also it allowes for hight learning rate which will come in handy if you try to train the model for higher epoch . seperable conv2D is used to reduce the total number of parameters to train the system . 
+In addition, you can also control the spawn location of the target object in the shelf. To do this, modify the **spawn_location** argument in `target_description.launch` file under /RoboND-Kinematics-Project/kuka_arm/launch. 0-9 are valid values for spawn_location with 0 being random mode.
 
-#### Decoder block
+You can launch the project by
+```sh
+$ cd ~/catkin_ws/src/RoboND-Kinematics-Project/kuka_arm/scripts
+$ ./safe_spawner.sh
+```
 
-Decoder block consist of bilinear up-sampling layer , concatenation and a seperable conv2d layer fitted wiht batch normalization . the up-sampling layer uses weighter resampling technique to increase the dimension of the input .
+If you are running in demo mode, this is all you need. To run your own Inverse Kinematics code change the **demo** flag described above to _"false"_ and run your code (once the project has successfully loaded) by:
+```sh
+$ cd ~/catkin_ws/src/RoboND-Kinematics-Project/kuka_arm/scripts
+$ rosrun kuka_arm IK_server.py
+```
+Once Gazebo and rviz are up and running, make sure you see following in the gazebo world:
 
-P12 = P1 + W1*(P2 - P1)/W2  
+	- Robot
+	
+	- Shelf
+	
+	- Blue cylindrical target in one of the shelves
+	
+	- Dropbox right next to the robot
+	
 
-this is the formula by which the up sampler increases the dimentions 
+If any of these items are missing, report as an issue.
 
-after upsampling , the result is concatenated with a layer from encoder which has the same dimention . this technique is called skip connection which helps in retaining the useful information . a seperable conv2D layer is added to the end of the skipconnection . this conv2d layer uses stride value of 1 so there is not change in the dimentionality 
+Once all these items are confirmed, open rviz window, hit Next button.
 
-#### 1x1 convolution layer 
+To view the complete demo keep hitting Next after previous action is completed successfully. 
 
-1x1 conv is a way of retaining the spacial information which will be loosed if we use fully connected layer . fundamentally it is same as the convolution 2d layer with same padding , stride of 1 and 1x1 kernal .  this provides an advantage of using different size image as the input since we dont have a fixed number of nuerons as teh fully connected layer
+Since debugging is enabled, you should be able to see diagnostic output on various terminals that have popped up.
 
-#### final architecture
+The demo ends when the robot arm reaches at the top of the drop location. 
 
-as you can see in the model.summery() output provided above , i have used 32,64,128 as filter size for the encoder and reconstructed them using the same filter size and used three skip connections . final layer output shape is same as the input provided (160,160,3). 
+There is no loopback implemented yet, so you need to close all the terminal windows in order to restart.
 
-### Hyper parameter 
+In case the demo fails, close all three terminal windows and rerun the script.
 
-###### my parameters used 
-
-* Epoch = 30
-* Batch size = 16 (can be changed )
-* steps per epoch = 280 (i used 4100+ training data )
-* validation_steps = 50
-* workers = 2
-* learning rate = 0.01
-* optimizer = Adam optimizer
-* passes per batch = 30 X 280 = 8400
-
-i trainied my model over 4100+training data and 1500+ validation data . this forced me to run the training session for a more epochs . i setteled on 30 epochs because it gave me a good ourput and after that the validation loss started to oscillate up and down . my GPU suffered from low memory and this is the reason i choose a low batch size 16 so i can train my model without crashing my system . this can always be changed based on the hardware . to speed up the convergence process , i choose a learning rate of 0.01 after trying our several rates like 0.001,0.005 etc . this rate seems to work good for me on the training data i collected 
-
-### limitations 
-
-* my detections have black spots in it due to the lack of activation . this can be avoided by training the model for few more epoch and also increasing the dataset can help this 
-* A descent GPU is required to run a inference of my model . this makes it hard to impliment this model in a small drone which should relay on a GPU server to process the live feeds
-* The model is trained only on 3 labels so the pixel classification is limited to those 3 labels . to use this model for a much wider classification problem , retraining or transfer learning is required
-* few miss clasification of environment pixels can be seen . the main cause for this is the similarities on the color of hte building and the people . this can also be avoided by using more data 
-
-### Output of the model
-
-
-![alt text][image1]
-![alt text][image2]
-![alt text][image3]
-
-
- 
