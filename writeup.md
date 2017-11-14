@@ -1,116 +1,118 @@
-## Project: Kinematics Pick & Place
+[arch]: ./images/arch.jpg
+
+#### Project: Follow me
 ---
 
-## [Rubric](https://review.udacity.com/#!/rubrics/972/view) Points
-### Here I will consider the rubric points individually and describe how I addressed each point in my implementation.  
+##### The write-up conveys the an understanding of the network architecture.
+
+The student clearly explains each layer of the network architecture and the role that it plays in the overall network. The student can demonstrate the benefits and/or drawbacks different network architectures pertaining to this project and can justify the current network with factual data. Any choice of configurable parameters should also be explained in the network architecture.
+
+The student shall also provide a graph, table, diagram, illustration or figure for the overall network to serve as a reference for the reviewer.
 
 ---
-### Writeup / README
 
-#### 1. Provide a Writeup / README that includes all the rubric points and how you addressed each one.  You can submit your writeup as markdown or pdf.  
+Since what the network should output is an image with each pixel representing the likelihood of it being part of the target, I used a fully convolutional network, with encoders and decoders and a normalizing layer in-between.
 
-You're reading it!
+For the decoders to be able to better reconstruct the output image from the 1x1 convolutional layer, I added skip connections to the decoding layers. The network is very similar to the one we had to build for the last lab before the assignment.
 
-### Kinematic Analysis
-#### 1. Run the forward_kinematics demo and evaluate the kr210.urdf.xacro file to perform kinematic analysis of Kuka KR210 robot and derive its DH parameters.
+The number of encoders and decoders is 3. The kernel size for the convolution layers is 3. The size of the 1x1 layer I went with was 256. It was enough to get a score above 0.40, but most likely the network can be improved by deepening it. However, given the fact that the input image is quite small (160x160), I don't think a whole lot more can be done since it becomes hard even for a human to tell people apart in an image that size.
 
-Following the instructions in the KR210 Forward Kinematics lectures, I was able to derive all of the DH parameters for the kinematic structure of the Kuka KR210 robot.
+![architecture][arch]
 
- i | alpha(i-1) | a(i-1) | d(i-1)       | theta_i
--- | ---        | ---    | ---          | ---
- 1 | 0          | 0      | 0.33 + 0.42  | theta_1
- 2 | -pi/2      | 0.35   | 0            | theta_2 - pi/2
- 3 | 0          | 1.25   | 0            | theta_3
- 4 | -pi/2      | -0.054 | 0.96 + 0.54  | theta_4
- 5 | pi/2       | 0      | 0            | theta_5
- 6 | -pi/2      | 0      | 0            | theta_6
- 7 | 0          | 0      | 0.193 + 0.11 | theta_7
+---
 
-How I got the translation values in the DH parameter table:
+##### The write-up conveys the student's understanding of the parameters chosen for the the neural network.
 
-Links | type of transform              | measured from
----   | ---                            | ---
-0->1  | translation along z axis       | sum of z translation for joint1 and joint 2
-1->2  | translation along x axis       | x translation for joint2
-2->3  | translation along z axis       | z translation for joint3
-3->4  | translation along z and x axis | z translation for joint4 and sum of x translation for joint4 and joint5
-4->5  |                                |
-5->6  |                                |
-6->EE | translation along x axis       | sum of x translation for joint6 and gripper_joint
+The student explains their neural network parameters including the values selected and how these values were obtained (i.e. how was hyper tuning performed? Brute force, etc.)
+All configurable parameters should be explicitly stated and justified.
 
-![Joints Diagram](./misc_images/joints-diagram.png)
+---
 
-#### 2. Using the DH parameter table you derived earlier, create individual transformation matrices about each joint. In addition, also generate a generalized homogeneous transform between base_link and gripper_link using only end-effector(gripper) pose.
-Each transform matrix follows the same format. If we store the alpha, a, d, and theta values in arrays indexed `i` from 0 to 6, we can generate matrices using the following code:
-```python
-Matrix([
-    [ cos(q[i]),                 -sin(q[i]),                0,              a[i]                  ],
-    [ sin(q[i]) * cos(alpha[i]), cos(q[i]) * cos(alpha[i]), -sin(alpha[i]), -sin(alpha[i]) * d[i] ],
-    [ sin(q[i]) * sin(alpha[i]), cos(q[i]) * sin(alpha[i]), cos(alpha[i]),  cos(alpha[i]) * d[i]  ],
-    [ 0,                         0,                         0,              1]
-])
+The parameters for the neural network were the following:
+
+The *learning rate* provides a way to tune how fast the neural net adjusts to fit new samples that are used for training. The smaller the learning rate, the more times it has to be shown the training samples in order to be able to improve to fit them correctly.
+
+The *number of epochs* is the number of times the network is shown the full set of training samples. The bigger the number of epochs, the smaller the error should get. However, training a network for a large number of epochs could make it overfit the training set, leading to a worse performance normally on other samples.
+
+The training samples are split into batches. Then, for each one of the batches, the training samples are passed throught the network and the weights are adjusted. The *batch size* represents the number of samples that are in a batch. The larger the number of samples in a batch, the more precise the loss estimation can be. However, having a lot of samples in a batch makes training slower.
+
+*Steps per epoch* represents the number of batches in the training set.
+
+*Validation steps* represents the number of batches in the validation set.
+
+By changing the number of *workers*, you could use more cores in the training, probably because the computation runs on the GPUs, this one does not influence how fast the network trains.
+
+The values for the parameters:
+
+```
+learning_rate = 0.0016
+batch_size = 35
+num_epochs = 25
+steps_per_epoch = 152
+validation_steps = 30
+workers = 4
 ```
 
-To put the generated matrices for the transform between each joint, we can calculate our matrix as
-```python
-T0_EE = transform_matrices[0]
-  for i in range(1, 7):
-      T0_EE = T0_EE * transform_matrices[i]
-```
+To get to these values, I started with a set of values (0.001 for learning rate, 50 for batch size, 20 epochs) and then changed them until I got a passing score. Unfortunately, I realized at some point that on most of my tweaking runs, I was continuing from the same model (by re-running the training cell) instead of re-running the whole notebook which reinitializes the model weights. :(
 
-which gives us a single matrix indicating the transformation between the base link and the gripper link.
+When doing the search, I was looking for a less steep decline in loss in the first three epochs and for a decent training speed since I did a lot of runs -- almost used all my $100 credit, most likely wasted more than half of it unfortunately.
 
-#### 3. Decouple Inverse Kinematics problem into Inverse Position Kinematics and inverse Orientation Kinematics; doing so derive the equations to calculate all individual joint angles.
-![Inverse Tangent Diagram](./misc_images/atan2-diagram.png)
+I recorded extra images for the training, so in the end I had 5244 samples for training, hence the value for steps_per_epoch, to be able to cover all samples every epoch.
 
-For calculating theta1, theta4, theta5, and theta6, we know that the angle is part of a right triangle whose leg lengths we already know. Since we just have a right triangle, we know that the tangent of the angle we need to calculate is equal to the ratio of the two leg lengths that know as well. To get the angle, then, we can simply use `atan2` to calculate the inverse tangent with the resulting angle in the correct quadrant based on the signs of the two parameters.
+---
 
-theta1 controls the yaw movement, so we can calculate it as `atan2(WC[1], WC[0])`
+##### The student has a clear understanding and is able to identify the use of various techniques and concepts in network layers indicated by the write-up.
 
-Once we have calculated R3_6, we can calculate theta4, theta5, and theta6 using the same method of calculating the inverse tangent based on legs of the right triangles formed by the links. Because there exist two solutions for the group of theta4, theta5, and theta6, we first calculate a value for theta5 and then use the quadrant of that angle to select the quadrant for theta4 and theta6.
+The student is demonstrates a clear understanding of 1 by 1 convolutions and where/when/how it should be used.
+The student demonstrates a clear understanding of a fully connected layer and where/when/how it should be used.
 
-```python
-theta5 = atan2(sqrt(R3_6[0, 2] * R3_6[0, 2] + R3_6[2, 2] * R3_6[2, 2]), R3_6[1, 2])
+---
 
-if sin(theta5) < 0:
-    theta4 = atan2(-R3_6[2, 2], R3_6[0, 2])
-    theta6 = atan2(R3_6[1, 1], -R3_6[1, 0])
-else:
-    theta4 = atan2(R3_6[2, 2], -R3_6[0, 2])
-    theta6 = atan2(-R3_6[1, 1], R3_6[1, 0])
-```
+1x1 convolutions could be used for dimensionality reduction, since they summarize pixel data from multiple channels to a smaller number of new channels. A 1x1 convolution is used in the last encoding part of the FCN. The number of filters is the new number of channels that the 1x1 layers summarizes for one pixel of the image.
 
-For theta2 and theta3, however, we must make calculate the angles using the law of cosines, since the translations provide us the three sides of a transformation triangle and we need to know the angles within that triangle to calculate our theta values.
+Because the data comes from the channels of the sample pixel, and because the convolution is followed by a batch normalization with a ReLUs, the 1x1 convolution also becomes a non-linear transformer of the channels in the previous layer.
 
-To make this calculation, we first calculate the three sides of the triangle by combining the link lengths and transform values.
+However, this reduction in dimension takes place at the channel/filter level, not at the spatial level (width or height).
 
-```python
-side_a = sqrt(dh_params[d[3]] ** 2 + dh_params[a[3]] ** 2)
-side_c = dh_params[a[2]]
-side_b = sqrt((sqrt(WC[0] ** 2 + WC[1] ** 2) - dh_params[a[1]]) ** 2 + (WC[2] - dh_params[d[0]]) ** 2)
-```
+In this particular architecture, a 1x1 convolution is used in the middle layer to add non-linearity to the model.
 
-With all three sides of the triangle, we can apply the law of cosines to get us the three angles A, B, and C.
+In fully connected layers, all outputs are connected to all the activations in the previous layer. These layers are especially good at classification, since for a pixel that's classified, channels of the pixels that are near it are also considered when training.
 
-```python
-angle_a = acos((side_b ** 2 + side_c ** 2 - side_a ** 2) / (2 * side_b * side_c))
-angle_b = acos((side_a ** 2 + side_c ** 2 - side_b ** 2) / (2 * side_a * side_c))
-angle_c = acos((side_a ** 2 + side_b ** 2 - side_c ** 2) / (2 * side_a * side_b))
-```
+---
 
-With these angles, we can calculate the values of theta2 and theta3 since the sum of the theta values, triangle angles, and inverse tangent from the transform add up to 90 degrees. One additional adjustment we must make for theta3 is to account for the sag in the fourth link, which we do by adding back `atan2(abs(dh_params[a[3]]), dh_params[d[3]])`
+##### The student has a clear understanding of image manipulation in the context of the project indicated by the write-up.
 
-```python
-theta2 = pi/2 - angle_a - atan2(WC[2] - dh_params[d[0]], sqrt(WC[0] ** 2 + WC[1] ** 2) - dh_params[a[1]])
-theta3 = pi/2 - angle_b - atan2(abs(dh_params[a[3]]), dh_params[d[3]])
-```
+The student is able to identify the use of various reasons for encoding / decoding images, when it should be used, why it is useful, and any problems that may arise.
 
-### Project Implementation
-#### 1. Fill in the `IK_server.py` file with properly commented python code for calculating Inverse Kinematics based on previously performed Kinematic Analysis. Your code must guide the robot to successfully complete 8/10 pick and place cycles. Briefly discuss the code you implemented and your results.
-To reduce duplicate code in my inverse kinematics implementation, I decided to store the symbols for alpha, a, d, and q in arrays instead of individual variables, which allowed me to perform tasks such as generating each transformation matrix through iteration over those arrays instead of writing duplicate code with different variables used for each.
+---
 
-Another change I made was to use the transposed R0_3 matrix for inverse kinematics instead of using the original code that tried to solve it using a library method, which allowed me to gain more accurate inverse kinematics results.
+There are two parts to the neural network I used in the project: an encoding part and a decoding part that trained together, end-to-end.
 
-When run with the Gazebo simulator, the code is able to perform the task almost each time, picking up the can and dropping it into the goal (see pick-place-demonstration.mov for example runs). One improvement to make would be to make the arm motions more continuous, instead of slowing down to each waypoint.
+At each one of the three layers of the encoding part, the actual height and width of the output become smaller, so we can talk about a reduction in the size of the image on these two dimensions. However, the network makes up for this loss in height and width by creating a deeper model of the image (can be seen of the diagram). After the last encoding layer, the image is transformed to a 20 x 20 x 256.
 
-To implement the solution to this exercise, I used the Atom text editor and ran tests through VMWare Fusion on a Mac.
+In the decoding layers, bilinear interpolation is used to upscale the image coming from the previous layer to an image of the same size (height and width) as the output of that layer. That image is also concatenated to the image of the same size coming from the corresponding encoding layer.
+
+Being trained end-to-end, the network improves both the encoding half (how well it can summarize what's going on in the original training sample), as well as the decoding half (how well it can reconstruct the position of the detected objects from the data encoded in the middle layer).
+
+In the context of image manipulation (if you view the neural network as a photo filter), the network takes as input a photo taken by the drone camera and produces a photo of the same size, in which each pixel is colored depending what class is the object that the neural network thinks that pixel is part of. Hence, the detected objects lose their detailed features, being replaced by blobs of color, each class having its own color.
+
+---
+
+##### The student displays a solid understanding of the limitations to the neural network with the given data chosen for various follow-me scenarios which are conveyed in the write-up.
+
+The student is able to clearly articulate whether this model and data would work well for following another object (dog, cat, car, etc.) instead of a human and if not, what changes would be required.
+
+---
+
+This model is obviously trained for detecting the person wearing red, but with different training data, the same architecture most likely can be trained to detect other types of objects.
+
+---
+
+##### Future improvements
+
+Camera resolution could be improved in order to provide a more detailed view of what's in front of the drone.
+More samples could be recorded for both training and validation sets in order to improve the accuracy of the model.
+More layers could be added for an even deeper encoding of the given samples.
+
+Of course, none of these will work without also re-training the neural network.
+Running the training for more epochs would also improve the accuracy of the model.
