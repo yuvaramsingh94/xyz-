@@ -1,299 +1,114 @@
-## Project: Perception Pick & Place
+## Project: Follow Me
 
 ---
 
+**The goals / steps of this project are the following:**
 
-# Required Steps for a Passing Submission:
-1. Extract features and train an SVM model on new objects (see `pick_list_*.yaml` in `/pr2_robot/config/` for the list of models you'll be trying to identify).
-2. Write a ROS node and subscribe to `/pr2/world/points` topic. This topic contains noisy point cloud data that you must work with.
-3. Use filtering and RANSAC plane fitting to isolate the objects of interest from the rest of the scene.
-4. Apply Euclidean clustering to create separate clusters for individual items.
-5. Perform object recognition on these objects and assign them labels (markers in RViz).
-6. Calculate the centroid (average in x, y and z) of the set of points belonging to that each object.
-7. Create ROS messages containing the details of each object (name, pick_pose, etc.) and write these messages out to `.yaml` files, one for each of the 3 scenarios (`test1-3.world` in `/pr2_robot/worlds/`).  [See the example `output.yaml` for details on what the output should look like.](https://github.com/udacity/RoboND-Perception-Project/blob/master/pr2_robot/config/output.yaml)
-8. Submit a link to your GitHub repo for the project or the Python code for your perception pipeline and your output `.yaml` files (3 `.yaml` files, one for each test world).  You must have correctly identified 100% of objects from `pick_list_1.yaml` for `test1.world`, 80% of items from `pick_list_2.yaml` for `test2.world` and 75% of items from `pick_list_3.yaml` in `test3.world`.
-9. Congratulations!  Your Done!
-
-# Extra Challenges: Complete the Pick & Place
-7. To create a collision map, publish a point cloud to the `/pr2/3d_map/points` topic and make sure you change the `point_cloud_topic` to `/pr2/3d_map/points` in `sensors.yaml` in the `/pr2_robot/config/` directory. This topic is read by Moveit!, which uses this point cloud input to generate a collision map, allowing the robot to plan its trajectory.  Keep in mind that later when you go to pick up an object, you must first remove it from this point cloud so it is removed from the collision map!
-8. Rotate the robot to generate collision map of table sides. This can be accomplished by publishing joint angle value(in radians) to `/pr2/world_joint_controller/command`
-9. Rotate the robot back to its original state.
-10. Create a ROS Client for the “pick_place_routine” rosservice.  In the required steps above, you already created the messages you need to use this service. Checkout the [PickPlace.srv](https://github.com/udacity/RoboND-Perception-Project/tree/master/pr2_robot/srv) file to find out what arguments you must pass to this service.
-11. If everything was done correctly, when you pass the appropriate messages to the `pick_place_routine` service, the selected arm will perform pick and place operation and display trajectory in the RViz window
-12. Place all the objects from your pick list in their respective dropoff box and you have completed the challenge!
-13. Looking for a bigger challenge?  Load up the `challenge.world` scenario and see if you can get your perception pipeline working there!
-
-## [Rubric](https://review.udacity.com/#!/rubrics/1067/view) Points
-
-[//]: # "Image References"
-
-[confusion_matrix_1]: ./pictures/figure_1.png
-
-[confusion_matrix_2]: ./pictures/figure_2.png
-
-[pick_list_1]: ./pictures/pick_list_1.png
-
-[pick_list_2]: ./pictures/pick_list_2.png
-
-[pick_list_3]: ./pictures/pick_list_3.png
-
-### Exercise 1, 2 and 3 pipeline implemented
-#### 1. Complete Exercise 1 steps. Pipeline for filtering and RANSAC plane fitting implemented.
-- Statistical Outlier Filtering
-    Set the number of neighboring points 20 and threshold scale factor 0.3, any points with mean distance larger than (mean distance+x\*std_dev ) will be considered as outlier.
-```
-    fil = cloud.make_statistical_outlier_filter()
-    fil.set_mean_k(20)
-    fil.set_std_dev_mul_thresh(0.3)
-    filtered_cloud = fil.filter()
-```
-
-- Downsampling voxel grid
-    `LEAF_SIZE` is set as 0.005
-```
-    vox = filtered_cloud.make_voxel_grid_filter()
-
-    # Choose a voxel (also known as leaf) size
-    LEAF_SIZE = 0.005
-
-    # Set the voxel (or leaf) size  
-    vox.set_leaf_size(LEAF_SIZE, LEAF_SIZE, LEAF_SIZE)
-
-    # Call the filter function to obtain the resultant downsampled point cloud
-    cloud_vox = vox.filter()
-```
-
-- PassThrough Filter
-    Create Passthrough filter in y and z axes
-```
-    # Create a PassThrough filter object.
-    passthrough = cloud_vox.make_passthrough_filter()
-
-    # Assign axis and range to the passthrough filter object.
-    filter_axis = 'z'
-    passthrough.set_filter_field_name(filter_axis)
-    axis_min = 0.6
-    axis_max = 1.3
-    passthrough.set_filter_limits(axis_min, axis_max)
-
-    # Finally use the filter function to obtain the resultant point cloud.
-    cloud_passthrough = passthrough.filter()
-
-    # Create a PassThrough filter object.
-    passthrough = cloud_passthrough.make_passthrough_filter()
-
-    # Assign axis and range to the passthrough filter object.
-    filter_axis = 'y'
-    passthrough.set_filter_field_name(filter_axis)
-    axis_min = -0.5
-    axis_max = 0.5
-    passthrough.set_filter_limits(axis_min, axis_max)
-
-    # Finally use the filter function to obtain the resultant point cloud.
-    cloud_passthrough = passthrough.filter()
-```
-
-- RANSAC Plane Segmentation
-```
-    # Create the segmentation object
-    seg = cloud_passthrough.make_segmenter()
-
-    # Set the model you wish to fit
-    seg.set_model_type(pcl.SACMODEL_PLANE)
-    seg.set_method_type(pcl.SAC_RANSAC)
-
-    # Max distance for a point to be considered fitting the model
-    # Experiment with different values for max_distance
-    # for segmenting the table
-    max_distance = 0.01
-    seg.set_distance_threshold(max_distance)
-
-    # Call the segment function to obtain set of inlier indices and model coefficients
-    inliers, coefficients = seg.segment()
-```
-
-
-
-#### 2. Complete Exercise 2 steps: Pipeline including clustering for segmentation implemented.
-```
-    # Euclidean Clustering
-    white_cloud = XYZRGB_to_XYZ(cloud_objects)
-    tree = white_cloud.make_kdtree()
+* Clone the project repo here
+* Fill out the TODO's in the project code as mentioned here
+* Optimize your network and hyper-parameters.
+* Train your network and achieve an accuracy of 40% (0.40) using the Intersection over Union IoU metric which is * final_grade_score at the bottom of your notebook.
+* Make a brief writeup report summarizing why you made the choices you did in building the network.
 
-    # Create a cluster extraction object
-    ec = white_cloud.make_EuclideanClusterExtraction()
-    # Set tolerances for distance threshold
-    # as well as minimum and maximum cluster size (in points)
-    ec.set_ClusterTolerance(0.015)
-    ec.set_MinClusterSize(20)
-    ec.set_MaxClusterSize(3000)
-    # Search the k-d tree for clusters
-    ec.set_SearchMethod(tree)
-    # Extract indices for each of the discovered clusters
-    cluster_indices = ec.Extract()
-
-    # Create Cluster-Mask Point Cloud to visualize each cluster separately
-    #Assign a color corresponding to each segmented object in scene
-    cluster_color = get_color_list(len(cluster_indices))
-
-    color_cluster_point_list = []
-
-    for j, indices in enumerate(cluster_indices):
-        for i, indice in enumerate(indices):
-            color_cluster_point_list.append([white_cloud[indice][0],
-                                            white_cloud[indice][1],
-                                            white_cloud[indice][2],
-                                             rgb_to_float(cluster_color[j])])
-
-    #Create new cloud containing all clusters, each with unique color
-    cluster_cloud = pcl.PointCloud_PointXYZRGB()
-    cluster_cloud.from_list(color_cluster_point_list)
-
-    # Convert PCL data to ROS messages
-    ros_cloud_objects = pcl_to_ros(cloud_objects)
-    ros_cloud_table = pcl_to_ros(cloud_table)
-    ros_cluster_cloud = pcl_to_ros(cluster_cloud)
-
-    # Publish ROS messages
-    pcl_objects_pub.publish(ros_cloud_objects)
-    pcl_table_pub.publish(ros_cloud_table)
-    pcl_cluster_pub.publish(ros_cluster_cloud)
-```
-
-#### 3. Complete Exercise 3 Steps.  Features extracted and SVM trained.  Object recognition implemented.
-
-- Features extracted
-
-```
-    # Classify the clusters! (loop through each detected cluster one at a time)
-    detected_objects_labels = []
-    detected_objects = []
-
-    for index, pts_list in enumerate(cluster_indices):
-        # Grab the points for the cluster
-        pcl_cluster = cloud_objects.extract(pts_list)
-
-        # Convert the cluster from pcl to ROS using helper function
-        ros_cluster = pcl_to_ros(pcl_cluster)
-
-        # Extract histogram features
-        chists = compute_color_histograms(ros_cluster, using_hsv=True)
-        normals = get_normals(ros_cluster)
-        nhists = compute_normal_histograms(normals)
-        feature = np.concatenate((chists, nhists))
-
-        # Make the prediction, retrieve the label for the result
-        # and add it to detected_objects_labels list
-        prediction = clf.predict(scaler.transform(feature.reshape(1,-1)))
-        label = encoder.inverse_transform(prediction)[0]
-        detected_objects_labels.append(label)
-
-        # Publish a label into RViz
-        label_pos = list(white_cloud[pts_list[0]])
-        label_pos[2] += .4
-        object_markers_pub.publish(make_label(label,label_pos, index))
-
-        # Add the detected object to the list of detected objects.
-        do = DetectedObject()
-        do.label = label
-        do.cloud = ros_cluster
-        detected_objects.append(do)
-```
-
-- SVM trained
-
-  - In `features.py` (sensor_stick/src/sensor_stick):
-
-    32 bins with range (0, 256) to compute color histograms,
-
-    32 bins with range (-1, 1) to compute normal histograms.
-
-  - In 'capture_features.py' (sensor_stick/scripts):
-
-    50 features were captured for each object  to train SVM classifier.
-
-  The confusion matrix without normalization is
-
-![alt text][confusion_matrix_1]
-
-  The normalized confusion matrix is
-
-![alt text][confusion_matrix_2]
-
-- Object Recognition
-
-    Variables Initialization
-```
-    dict_list = []
-    labels = []
-    centroids = []
-    object_list_param = []
-    dropbox_param = []
-    pick_position = []
-    dropbox_position = []
-
-    test_scene_num = Int32()
-    object_name = String()
-    arm_name = String()
-    pick_pose = Pose()
-    place_pose = Pose()
-```
-
-​     Read objects and dropbox params from yaml files
-```
-    object_list_param = rospy.get_param('/object_list')
-    dropbox_param = rospy.get_param('/dropbox')
-```
-
-​     Loop through each object in the pick list, and ten assign the arm and 'place_pose' to be used for pick_place, create a list of dictionaries for later output to yaml file.
-```
-    for target in object_list:
-
-        labels.append(target.label)
-        points_arr = ros_to_pcl(target.cloud).to_array()
-        pick_position = np.mean(points_arr, axis=0)[:3]
-        pick_pose.position.x = np.float(pick_position[0])
-        pick_pose.position.y = np.float(pick_position[1])
-        pick_pose.position.z = np.float(pick_position[2])
-        centroids.append(pick_position[:3])
-
-        object_name.data = str(target.label)
-
-        # Assign the arm and 'place_pose' to be used for pick_place
-        for index in range(0, len(object_list_param)):
-            if object_list_param[index]['name'] == target.label:
-                object_group = object_list_param[index]['group']
-        for ii in range(0, len(dropbox_param)):
-            if dropbox_param[ii]['group'] == object_group:
-                arm_name.data = dropbox_param[ii]['name']
-                dropbox_position = dropbox_param[ii]['position']
-
-                place_pose.position.x = np.float(dropbox_position[0])
-                place_pose.position.y = np.float(dropbox_position[1])
-                place_pose.position.z = np.float(dropbox_position[2])
-
-        # Create a list of dictionaries (made with make_yaml_dict()) for later output to yaml format
-        yaml_dict = make_yaml_dict(test_scene_num, arm_name, object_name, pick_pose, place_pose)
-        dict_list.append(yaml_dict)
-```
-### Pick and Place Setup
-
-#### 1. For all three tabletop setups (`test*.world`), perform object recognition, then read in respective pick list (`pick_list_*.yaml`). Next construct the messages that would comprise a valid `PickPlace` request output them to `.yaml` format.
-- Output request parameters into output yaml file
-```
-    yaml_filename = 'output_' + str(test_scene_num.data) + '.yaml'
-
-    send_to_yaml(yaml_filename, dict_list)
-```
-
-- Object recognition results
-
-  all objects in `pick_list_*.yaml` are correctly recognized, as shown in following. The `yaml` file can be found in (/output) folder.
-
-  ![alt text][pick_list_1]
-  ![alt text][pick_list_2]
-  ![alt text][pick_list_3]
-
-### Conclusion
-
-This has been a very comprehensive project--by far the most challenging in the course so far. To improve it further, it would be best to run the project in a native Linux enivronment, without a Virtual Machine -- due to much of the errors coming from lag, and the robot not fully grasping objects, or simply holding onto them for too long. There could also be more development done in detecting the glue object that appears in world2 and world3. It is a small object, so many of the filters keeping the noise out would often exclude it from our analysis.
+[//]: # (Image References)
+
+[image1]: ./image1.jpg
+[image2]: ./image2.jpg
+
+
+## [Rubric](https://review.udacity.com/#!/rubrics/1155/view) Points
+### Here I will consider the rubric points individually and describe how I addressed each point in my implementation.
+
+---
+### Writeup / README
+
+#### 1. Provide a Writeup / README that includes all the rubric points and how you addressed each one.  You can submit your writeup as markdown or pdf.
+
+You're reading it!
+
+#### 2. Network architecture
+
+For this project I used a Fully-convolutional Neural Network (FCN), which allows us to do semantic segmentation and pinpoint exactly where a certain object is on an image. The network reads in images as inputs and assigns weights to each pixel in its output layer, allowing us to classify the object in any location. Unlike CNNs, which contain fully-connected layers and hence lose spatial information, FNNs use only convolutional layers.
+
+The overall structure of the network I built consists of two main parts - an encoding block and a decoding block, which are connected by a 1x1 convolutional layer. The encoding block extracts features used for segmentation, starting with layers that recognize simpler shapes and patterns and then proceeding with deeper layers that can learn more complex shapes. The 1x1 layer has roughly the same function and it fully maintains spatial information. The following decoding layers that are connected to it gradually decrease in depth and increase in size, ultimately restoring the dimensions of the input image. There are also skip connections along the way, whose purpose is to skip some intermediate layers and connect directly to non-adjacent layers. Thus they can preserve some information that might otherwise be lost in the encoding. The final output layer after the decoding block is a convolutional layer with softmax activation, which yields the classification between the three classes for every pixel.
+
+After experimenting with a couple of different models, I decided on an architecture that uses two encoder layers, one 1x1 convolution layer, and two decoder layers. The filter sizes for the encoder layers are 32 and 64, respectively, with the convolution layer having a filter size of 128, while the decoder layer reduce back the size from 64 to 32, respectively. The stride of two and the same padding of the encoding and decoding layers have the overall effect of halving the image size while increasing depth.
+
+layer | filter size | stride
+--- | --- | ---
+encoder 1 | 32 | 2
+encoder 2 | 64 | 2
+1x1 convolution | 128 | 1
+decoder 1 | 64 | 2
+decoder 2 | 32 | 2
+
+The output of the last decoder layer is connected to an output convolution with softmax activation.
+
+![alt text][image1]
+
+A couple of alternative designs I tried:
+
+  - I added an extra convolutional and decoder layers to increase depth. This was making training too slow and not giving any accuracy improvements.
+  - I tried using larger filter sizes: 64 -> 128 -> 256 -> 128 -> 64. Training was slower and the score wasn't improving significantly, possibly due to requiring more epoch or tweaks in the other parameters.
+
+Ultimately, the architecture with the best score was the one outlined above, and it also had the benefit of having a faster training time, which allowed me to iterate faster in the tuning of the network hyper parameters.
+
+#### 3. Network parameters
+
+Here are the final network parameters that I used:
+
+    learning_rate = 0.002
+    batch_size = 32
+    num_epochs = 100
+    steps_per_epoch = 200
+    validation_steps = 50
+    workers = 2
+
+I immediately started using the AWS p2 GPU instance and I never tried training locally on my laptop, which I suspect would've been extremely slow.
+
+First, I ran a couple of experiments with the number of workers (`workers`) parameter keeping all values set to the default except for `num_epoch = 1`. It seemed the default value of `2` was the best option even for the AWS GPU instance. I didn't get a noticeable improvement with `4` and performance was degrading with more workers.
+
+Regarding, `validation_steps`, `steps_per_epoch`, and `num_epochs` parameters, I was guided by a few simple rules that I thought made sense to follow:
+
+- The training set contained `5350` images (since I had added some extra images) and the validation set had `1184` images. Hence, it made sense to maintain the same proportion for `steps_per_epoch` relative to `validation_steps`, i.e. `steps_per_epoch = 4.5 * validation_steps`.
+- The rough rule that `steps_per_epoch` should be some multiple of the total number of images in the training dataset divided by the `batch_size`. This is to make sure that the vast majority of the training set is "seen" by the training algorithm.
+
+I was planning to start training with a default of `10` epochs and use the epoch number as a means to control overfitting. This means that roughly `500` images should be covered per epoch (preferable some larger multiple of that). Since batches are random and I wanted to get good coverage of the training set, I started with a batch size of `25`. Later, I experimented with batch sizes of `50` and reduced `steps_per_epoch` to `110` and `validation_steps` to `25`. These values mean that `steps_per_epoch * num_epochs * batch_size = 5500` images will be processed per epoch. I also tried batch size of `100` but this lead to instability in the training loss and validation loss, possibly indicating overfitting and the model not being able to generalize (score `0.3189`). The final value I got the best results with was using a batch size of `32`, and restoring the number of `steps_per_epoch` to `200` so that I have good coverage of the training set.
+
+I set the `learning_rate` through experimentation. I started with a `learning_rate` of `0.01` (score `0.3959`) and proceeded to reduce it to `0.001` and then slightly up to `0.002` as a safe enough value that would allow me to decrease the number of epochs. This was also the value that gave me the best IoU scores. The previous high learning rate was causing the validation loss to fluctuate a lot, possibly due to noise.
+
+![alt text][image2]
+
+Ultimately I was able to obtain a score of `0.442620757002`.
+
+#### 4. Techniques and concepts in the neural network layers (1x1 vs fully connected layer)
+
+The most notable technique in the FCN is the use of a 1x1 convolution layer, which allows the network to retain spatial information from the encoding block. Unlike fully connected layers where the data is flattened to two dimensions and spatial information is lost, 1x1 convolution increases depth and maintains volume of the previous layer so that location information can be preserved.
+
+#### 5. Image manipulation concepts
+
+Another notable feature of FCNs is the use of encoding and decoding blocks. An encoding block reads in an image and effectively recognizes specific features. Later, these feature maps are up-scaled in the decoding layer up to the original image dimension, allowing classification to be carried out at the pixel level. Skip connections also help preserve certain low-level information like pixel colors or edge information that might get lost in subsequent encoding layers.
+
+#### 6. Network limitations
+
+Currently, the network has only three output dimensions and hence three output classes. As such it can't be used to classify more than 3 classes, like 'cat', 'dog', etc. To do that, we would need to change the depth.
+
+Additionally, the network would need to be partially retrained to recognize a different type of object. This can be achieved by taking out the encoding block and replacing it with another encoding block that was trained for a different object. The encoder/decoder structure and the use of skip connections means that the network would need to be retrained at that point.
+
+
+### Model
+
+#### 1. The model is submitted in the correct format.
+
+The enclosed `config_model_weights` and `model_weights` contain the model saved in the `.h5` format.
+
+#### 2. The neural network must achieve a minimum level of accuracy for the network implemented.
+
+The level of accuracy achieved with the enclosed model is `0.442620757002`.
+
+### Future Enhancements
+
+- Gather better data:
+  - It seems most of the images don't contain the hero, and the training set could be improved if the proportion of images with the hero was higher.
+  - Most of the low scores were due to many false negatives when the hero is far away. Potentially, gather more images of the hero in the distance.
+- Better hyper parameter search.
