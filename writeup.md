@@ -1,45 +1,63 @@
-## Project: Follow me
+# Project Follow me
 
+## Steps to complete the project:
+Clone the project repo [here](https://github.com/udacity/RoboND-DeepLearning-Project)
+Fill out the TODO's in the project code in the code/model_training.ipynb file.
+Optimize your network and hyper-parameters.
+Train your network and achieve an accuracy of 40% (0.4) using the Intersection over Union IoU metric.
+Make a brief writeup report summarizing why you made the choices you did in building the network.
+## Project Specification
+Rubric points for this project are explained [here](https://review.udacity.com/#!/rubrics/1155/view).
 
----
+## writeup
+### Model architecture
+In this project I used the following model. This is called the encoder decoder model and it is known to be effective in the area of ​​image segmentation. The most famous architecture is [U-Net](https://lmb.informatik.uni-freiburg.de/people/ronneber/u-net/), but this time I got the result I wanted without using a complicated architecture.
+ 1. InputLayer:**IN** 160x160x3, **OUT** 160x160x3
+ 2. SeparableConv2D:**IN** 160x160x3, **OUT** 80x80x32
+ 3. BatchNorm:**IN** 80x80x3, **OUT** 80x80x3
+ 4. SeparableConv2D:**IN** 80x80x32, **OUT** 40x40x64
+ 5. BatchNorm:**IN** 40x40x64, **OUT** 40x40x64
+ 6. SeparableConv2D:**IN** 40x40x64, **OUT** 20x20x128
+ 7. BatchNorm:**IN** 20x20x128, **OUT** 20x20x128
+ 8. Conv2D:**IN** 20x20x128, **OUT** 20x20x256
+ 9. BatchNorm:**IN** 20x20x256, **OUT** 20x20x258
+ 10. BilinearUpSampling2D:**IN** 20x20:256, **OUT** 40x40x256
+ 11. Concatnate:**IN** 10 and 5, **OUT** 40x40x320
+ 12. SeparableConv2D:**IN** 40x40x320, **OUT** 40x40x128
+ 13. BatchNorm:**IN** 40x40x128, **OUT** 40x40x128
+ 14. BilinearUpSampling2D:**IN** 40x40x128, **OUT** 80x80x128
+ 15. Concatnate:**IN** 14 and 3, **OUT** 80x80x160
+ 16. SeparableConv2D:**IN** 80x80x160, **OUT** 80x80x64
+ 17. BatchNorm:**IN** 80x80x64, **OUT** 80x80x64
+ 18. BilinearUpSampling2D:**IN** 80x80x64, **OUT** 160x160x64
+ 19. Concatnate:**IN** 18 and 1, **OUT** 160x160x67
+ 20. SeparableConv2D:**IN** 160x160x67, **OUT** 160x160x32
+ 21. BatchNorm:**IN** 160x160x32, **OUT** 160x160x32
+ 22. Conv2D:**IN** 160x160x32, **OUT** 160x160x3
 
+Just to be afraid, a convolution network called CNN is used for each layer. This is a configuration often used in the area of ​​image processing. In addition, the batch normalization layer normalizes the variation of data in the batch, and learning can be advanced quickly. This is said that because the bias of data input for each layer decreases, the input data will be within a certain range, so convergence of learning becomes faster accordingly. Separable (Depthwise) The convolution layer is usually to calculate both the channel and the spatial position by brute force, calculate the output which was separately calculated, and shorten the calculation time by combining later It is aimed at. It is said to be a contrivance in calculation, it is said that the calculation result does not change with the convolution layer.
 
-[//]: # (Image References)
+### Training
+In the training phase, the most important thing is adjustment of hyper parameters. Originally if you use [hyperopt](https://github.com/hyperopt/hyperopt), [GridSearchCV](http://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html), etc. for parameter adjustment, you can decide the value exhaustively and objectively, but this time it was not done because of calculation time. First, learning_rate, but tried 0.005, 0.0015, 0.001. Since it diverges when increasing the value, there is an aim to surely converge with a small value. I finally learned well with 0.005, so I used it. Next is epoch number, which is determined by how much learning converges. Since we converged at about 20 this time, we used that value. If it does not converge it will only stretch. For other parameters, we decided based on private GPU.
 
-[image1]: ./model.png
+### Result
+The dataset of this project is downloaded from [Here](https://classroom.udacity.com/nanodegrees/nd209/parts/09664d24-bdec-4e64-897a-d0f55e177f09/modules/cac27683-d5f4-40b4-82ce-d708de8f5373/lessons/197a058e-44f6-47df-8229-0ce633e0a2d0/concepts/06dde5a5-a7a2-4636-940d-e844b36ddd27)
+ * following_images : Images recognizing targets to follow.
+ * patrol_with_targ : Images that we recognize including targets that follow and others.
+ * patrol_non_targ : Image with no target.
 
-## [Rubric](https://review.udacity.com/#!/rubrics/1155/view) Points
-### Here I will consider the rubric points individually and describe how I addressed each point in my implementation.
+ * following_images  
+ ![image1](./docs/misc/following_images.png)
 
----
-### Writeup / README
+ * patrol_with_targ  
+ ![image1](./docs/misc/patrol_with_targ.png)
 
-#### 1. Provide a Writeup / README that includes all the rubric points and how you addressed each one.  You can submit your writeup as markdown or pdf.
+ * patrol_non_targ  
+ ![image1](./docs/misc/patrol_non_targ.png)
 
-You're reading it!
+Finally I can got 0.41 score in my trial.
 
-### Network architecture
-#### 1. Clearly explains each layer of the network architecture and the role that it plays in the overall network.
-A three-layer encoder/decoder setup is used in this project. The encoder blocks are comprised of a separable ConvNet and a batch normalization step. Each encoder layer uses kernel size of 3 and stride of 2, yielding a half-sized width/height for the next layer. The filter sizes are set up in ascending order. An 1x1 ConvNet is added after the encoder steps. Each decoder block includes a concatenated large and small layer. The small layer, which is the later layer of the encoder blocks, is upsampled by a factor of 2, which reverses the halving of the encoder outputs. Two separable layers with stride of 1 are added in the decoder block. The complete structure is generated using Keras plot as included. In the end, there is a fully connected layer to get the final output.
-
-![alt text][image1]
-
-#### 2. Explain the neural network parameters including the values selected and how these values were obtained (i.e. how was hyper tuning performed? Brute force, etc.)
-Larger batch size yields better results, but also takes longer to compute. I found a batch size of 32 is a reasonable choice. Initially, a small learning rate of 0.001 was used, but the model quickly fell into overfitting within 3 epochs. Reflected in the testing, a great more false positives in the no-target scenario and false negatives in the target-far scenario were observed. A learning rate of 0.01 reduced the overfitting problem, but more epochs were needed as the validation loss curve converged slower. I initially used 8 epochs but found that increasing it to 20 would yield much better results.
-
-
-#### 3. Demonstrate a clear understanding of 1 by 1 convolutions and a fully connected layer and where/when/how they should be used
-The 1x1 convolution layer convolve through the depth of the previous layer pixel by pixel, thus it can be a way for dimension reduction by reducing the filter size. In addition, it is a way to increase network depth (as each layer is accompanied with a nonlinear activation like relu) and hence improve performance.
-
-A fully connected layer is attached to the end of the network. It converts each pixel of the outputs from the previous layer to the the dimension the same as the number of classes. The probabilities are determined through the softmax function.
-
-#### 4. Identify the use of various reasons for encoding / decoding images, when it should be used, why it is useful, and any problems that may arise.
-
-The encoder takes the image and converts it to a high-depth feature volume. While it extracts abstract features, it loses spatial information. The decoder images gradually add back the previous layers through convoluting a concatenated upsampled deeper layer with a superficial layer, and consequently recover the spatial information as well as classify the pixels by the extracted features.
-
-#### 5. Whether this model and data would work well for following another object (dog, cat, car, etc.) instead of a human and if not, what changes would be required.
-
-This data would probably not work well for following the objects that never show up in the training data. A set of train/validation data containing those objects are needed. The model should allow more number of classes. However, since the existing model already extracted basic features, the new training may only need to train the layers close to the output.
-
-#### 6. Model
-The performance of the model yields 0.52 final grade score. Overall, it performed quite well for the images taken following behind the target, relatively good for the images without the target, but failed to detect more than 1/3 of the target in the far-away scenario. This may be solved by increasing the number of epochs and the learning depth.
+### Future improvement
+ * The resolution of the image should be more high, e.g. the size of image, and the quality of image.
+ * It is better to increase the dataset if you want to get more robustness in the other situation.
+ * To improve the model, we need to use automatic hyper parameter optimization because the tuning is not quantitative.
