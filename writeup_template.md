@@ -1,129 +1,400 @@
-# Project: Perception Pick & Place
+## Project: Search and Sample Return
+### Writeup Template: You can use this file as a template for your writeup if you want to submit it as a markdown file, but feel free to use some other method and submit a pdf if you prefer.
 
-## Required Steps for a Passing Submission:
-1. Extract features and train an SVM model on new objects (see `pick_list_*.yaml` in `/pr2_robot/config/` for the list of models you'll be trying to identify). 
-2. Write a ROS node and subscribe to `/pr2/world/points` topic. This topic contains noisy point cloud data that you must work with.
-3. Use filtering and RANSAC plane fitting to isolate the objects of interest from the rest of the scene.
-4. Apply Euclidean clustering to create separate clusters for individual items.
-5. Perform object recognition on these objects and assign them labels (markers in RViz).
-6. Calculate the centroid (average in x, y and z) of the set of points belonging to that each object.
-7. Create ROS messages containing the details of each object (name, pick_pose, etc.) and write these messages out to `.yaml` files, one for each of the 3 scenarios (`test1-3.world` in `/pr2_robot/worlds/`).  [See the example `output.yaml` for details on what the output should look like.](https://github.com/udacity/RoboND-Perception-Project/blob/master/pr2_robot/config/output.yaml)  
-8. Submit a link to your GitHub repo for the project or the Python code for your perception pipeline and your output `.yaml` files (3 `.yaml` files, one for each test world).  You must have correctly identified 100% of objects from `pick_list_1.yaml` for `test1.world`, 80% of items from `pick_list_2.yaml` for `test2.world` and 75% of items from `pick_list_3.yaml` in `test3.world`.
-9. Congratulations!  Your Done!
+---
 
-## Extra Challenges: Complete the Pick & Place
-7. To create a collision map, publish a point cloud to the `/pr2/3d_map/points` topic and make sure you change the `point_cloud_topic` to `/pr2/3d_map/points` in `sensors.yaml` in the `/pr2_robot/config/` directory. This topic is read by Moveit!, which uses this point cloud input to generate a collision map, allowing the robot to plan its trajectory.  Keep in mind that later when you go to pick up an object, you must first remove it from this point cloud so it is removed from the collision map!
-8. Rotate the robot to generate collision map of table sides. This can be accomplished by publishing joint angle value(in radians) to `/pr2/world_joint_controller/command`
-9. Rotate the robot back to its original state.
-10. Create a ROS Client for the “pick_place_routine” rosservice.  In the required steps above, you already created the messages you need to use this service. Checkout the [PickPlace.srv](https://github.com/udacity/RoboND-Perception-Project/tree/master/pr2_robot/srv) file to find out what arguments you must pass to this service.
-11. If everything was done correctly, when you pass the appropriate messages to the `pick_place_routine` service, the selected arm will perform pick and place operation and display trajectory in the RViz window
-12. Place all the objects from your pick list in their respective dropoff box and you have completed the challenge!
-13. Looking for a bigger challenge?  Load up the `challenge.world` scenario and see if you can get your perception pipeline working there!
 
-## [Rubric](https://review.udacity.com/#!/rubrics/1067/view) Points
+**The goals / steps of this project are the following:**  
+
+**Training / Calibration**  
+
+* Download the simulator and take data in "Training Mode"
+* Test out the functions in the Jupyter Notebook provided
+* Add functions to detect obstacles and samples of interest (golden rocks)
+* Fill in the `process_image()` function with the appropriate image processing steps (perspective transform, color threshold etc.) to get from raw images to a map.  The `output_image` you create in this step should demonstrate that your mapping pipeline works.
+* Use `moviepy` to process the images in your saved dataset with the `process_image()` function.  Include the video you produce as part of your submission.
+
+**Autonomous Navigation / Mapping**
+
+* Fill in the `perception_step()` function within the `perception.py` script with the appropriate image processing functions to create a map and update `Rover()` data (similar to what you did with `process_image()` in the notebook). 
+* Fill in the `decision_step()` function within the `decision.py` script with conditional statements that take into consideration the outputs of the `perception_step()` in deciding how to issue throttle, brake and steering commands. 
+* Iterate on your perception and decision function until your rover does a reasonable (need to define metric) job of navigating and mapping.  
+
+[//]: # (Image References)
+
+[image1]: ./misc/rover_image.jpg
+[image2]: ./calibration_images/example_grid1.jpg
+[image3]: ./calibration_images/example_rock1.jpg 
+
+## [Rubric](https://review.udacity.com/#!/rubrics/916/view) Points
 ### Here I will consider the rubric points individually and describe how I addressed each point in my implementation.  
 
 ---
 ### Writeup / README
 
-### Project Overview
-In this project I had to create a perception pipeline that would enable a simulated PR2 Robot to pick and place a set of objects placed in front of it on a table. The steps were:
+#### 1. Provide a Writeup / README that includes all the rubric points and how you addressed each one.  You can submit your writeup as markdown or pdf.  
 
-1. Create the perception pipeline
-2. Determine which basket each object was to be placed in based on a pick list
-3. Determine which arm (left or right) was most appropriate for picking and placing the object
+You're reading it! :)
 
-The final code that contains my perception pipeline and classification is named [project_template.py](https://github.com/michaelhetherington/RoboND-Perception-Project/blob/master/pr2_robot/scripts/project_template.py).
+### Notebook Analysis
+#### 1. Run the functions provided in the notebook on test images (first with the test data provided, next on data you have recorded). Add/modify functions to allow for color selection of obstacles and rock samples.
+The color selection of the obstacles was quite easy it's basically the opposite of the navigable path.
+```
+def obstacles(img, rgb_thresh=(160, 160, 160)):
+    color_select = np.zeros_like(img[:,:,0])
+    below_thresh = (img[:,:,0] < rgb_thresh[0]) \
+                & (img[:,:,1] < rgb_thresh[1]) \
+                & (img[:,:,2] < rgb_thresh[2])
+    color_select[below_thresh]=1
+    return color_select
+```
+For rock samples, I had to analyse the color range for yellow I would need to indicate and threshold for. Using the matplot lib interactive graph was good because the RGB values were available.
 
-My final yaml output files are:
-  - [output_1.yaml](https://github.com/michaelhetherington/RoboND-Perception-Project/blob/master/pr2_robot/scripts/output_1.yaml) with success rate of 100%
-  - [output_2.yaml](https://github.com/michaelhetherington/RoboND-Perception-Project/blob/master/pr2_robot/scripts/output_2.yaml) with success rate of 80%
-  - [output_3.yaml](https://github.com/michaelhetherington/RoboND-Perception-Project/blob/master/pr2_robot/scripts/output_3.yaml) with a success rate of 87.5%
+```
+def rock_samples(img):
+    color_select = np.zeros_like(img[:,:,0])
+    rock_thresh = (img[:,:,0] >= 140) & (img[:,:,0] <= 187) \
+                & (img[:,:,1] >= 108) & (img[:,:,1] <= 145)\
+                & (img[:,:,2] >= 0) & (img[:,:,2] <= 20)
+    color_select[rock_thresh]=1
+    return color_select
+```
 
-The following images are illustrations of the objects being recognised by the PR2 Robot camera in RViz for __Test World 1__.
+### Perspective Transform
 
-![demo-1](https://github.com/michaelhetherington/RoboND-Perception-Project/blob/master/writeup_images/recog_test_robot.png)
 
-![demo-2](https://github.com/michaelhetherington/RoboND-Perception-Project/blob/master/writeup_images/recog_test_camera.png)
+![alt tag](https://github.com/fola95/Udacity-Rover-Project/blob/master/code/graphs/rock-transform.png "Perspective transform")
 
-The following images are illustrations of the objects being recognised by the PR2 Robot camera in RViz for __Test World 2__.
+#### 2. Populate the `process_image()` function with the appropriate analysis steps to map pixels identifying navigable terrain, obstacles and rock samples into a worldmap.  Run `process_image()` on your test data using the `moviepy` functions provided to create video output of your result. 
+The process image function was a combination of the previous steps done in the jupyter notebook.
+The steps are:
+1. Apply perspective tansform on the said image
+2. With the transformed image perform thresholding for objects of interest: navigable path, obstacles and rocks
+3. Once we have the threshold values we convert these to rover coordinates
+4. Rover coordinates are then converted to world map coordinates for mapping
+5. The RGB values for each object to ensure contrast on the world map. Obstacles - RED, Navigable path - Green
 
-![demo-1](https://github.com/michaelhetherington/RoboND-Perception-Project/blob/master/writeup_images/recog_test2_robot.png)
+Please find video below:
 
-![demo-2](https://github.com/michaelhetherington/RoboND-Perception-Project/blob/master/writeup_images/recog_test2_camera.png)
+https://github.com/fola95/Udacity-Rover-Project/blob/master/output/mapping.mp4
 
-The following images are illustrations of the objects being recognised by the PR2 Robot camera in RViz for __Test World 3__.
+```
 
-![demo-1](https://github.com/michaelhetherington/RoboND-Perception-Project/blob/master/writeup_images/recog_test3_robot.png)
+# Define a function to pass stored images to
+# reading rover position and yaw angle from csv file
+# This function will be used by moviepy to create an output video
 
-![demo-2](https://github.com/michaelhetherington/RoboND-Perception-Project/blob/master/writeup_images/recog_test3_camera.png)
+def get_source_coords_ref():
+    source = np.float32([[14, 140], [301 ,140],[200, 96], [118, 96]])
+    return source
 
-The following discussed the finer details of my code implementation.
+def get_destination_coord_ref(image):
+    dst_size = 5 
+    bottom_offset = 6
+    destination = np.float32([[image.shape[1]/2 - dst_size, image.shape[0] - bottom_offset],
+                  [image.shape[1]/2 + dst_size, image.shape[0] - bottom_offset],
+                  [image.shape[1]/2 + dst_size, image.shape[0] - 2*dst_size - bottom_offset], 
+                  [image.shape[1]/2 - dst_size, image.shape[0] - 2*dst_size - bottom_offset],
+                  ])  
+    return destination
 
-### 1. Perception Pipeline
-The structure and code for the perception pipeline followed Exercises 1 to 3 from the Udacity coursework.
 
-#### Complete Exercise 1 steps. Pipeline for filtering and RANSAC plane fitting.
-The steps for completing the filtering and RANSAC plane fitting, as outlined and commented throughout my code, are:
-  1. Covert ROS msg to PCL data
-  2. Statistical Outlier Filtering - to remove the noise in the scene
-    - number of neighbouring points: __outlier_filter.set_mean_k(5)__
-    - threshold scale factor: __x = 5__
-  3. Voxel grid down sampling
-    - Leaf size: __LEAF_SIZE = 0.01__
-  4. Passthrough filter x3 for x-, y- and z-axes to narrow the target range down to the table top.
-    - Z-axis: __axis_min = 0.60__ and __axis_max = 1.00__ 
-    - Y-axis: __axis_min = -0.50__ and __axis_max = 0.50__
-    - X-axis: __axis_min = 0.30__ and __axis_max = 0.85__
-  5. RANSAC Plane Segmentation
-    - Model type: __set_model_type(pcl.SACMODEL_PLANE)__
-    - Max distance for a point to be in model: __max_distance = 0.01__
+def process_image(img):
+    # Example of how to use the Databucket() object defined above
+    # to print the current x, y and yaw values 
+    # print(data.xpos[data.count], data.ypos[data.count], data.yaw[data.count])
+
+    # TODO: 
+    # 1) Define source and destination points for perspective transform
+    # 2) Apply perspective transform
+    src = get_source_coords_ref()
+    destination = get_destination_coord_ref(img)
     
-#### Complete Exercise 2 steps. Pipeline for clustering for segmentation.
-The steps for completing the clustering for segmentation, as outlined and commented throughout my code, are:
-  1. Extract inliers and outliers - determines which points are objects and which are the table
-  2. Euclidean clustering
-    - Make KD-tree
-    - Cluster tolerance: __set_ClusterTolerance(0.05)__
-    - Min cluster size: __set_MinClusterSize(50)__
-    - Max cluster size: __set_MaxClusterSize(2000)__
-  3. Create cluster-cloud masking to make each object cluster a homogenous yet different colour
+    
+    warped, mask = perspect_transform(img, src, destination)
+
+    # 3) Apply color threshold to identify navigable terrain/obstacles/rock samples
+    path_thresh = path(warped)
+    obstacles_thresh= obstacles(warped)
+    rock_thresh= rock_samples(warped)
+    
+    # 4) Convert thresholded image pixel values to rover-centric coords
+    path_x, path_y = rover_coords(path_thresh)
+    obs_x, obs_y = rover_coords(obstacles_thresh)
+    rock_x, rock_y = rover_coords(rock_thresh)
+    
   
-#### Complete Exercise 3 steps. Train model data and classify objects in Test World.
-The steps for completing the model training and cluster classification, as outlined and commented throughout my code, are:
-  1. Capture the features of the objects that can be found in the scene. This was undertaken with helper code from Exercise 3.
-  2. Train the classification model using the training_set data. Load the model data in to the code.
-  3. Classify the clusters by first computing feature vectors and then using the trained classification model (previous step) to classify the objects. The feature vectors are calculated using the [features.py](https://github.com/michaelhetherington/RoboND-Perception-Project/blob/master/pr2_robot/scripts/features.py) script generated during the perception exercises and (typically) stored in the sensor_stick repository if following the Udacity course structure.
-  4. Publish messages to ROS containing labels for the objects in the Test World scene. Must create a publishing service.
+    
+    # 5) Convert rover-centric pixel values to world coords
+    size= 200;
+    
+    #print(data.yaw)
+    navigable_x_world, navigable_y_world= pix_to_world(path_x, path_y, data.xpos[data.count], data.ypos[data.count], data.yaw[data.count], data.worldmap.shape[0], 10)
+    obstacle_x_world, obstacle_y_world= pix_to_world(obs_x, obs_y, data.xpos[data.count], data.ypos[data.count], data.yaw[data.count], data.worldmap.shape[0], 10)
+    rock_x_world, rock_y_world= pix_to_world(rock_x, rock_y, data.xpos[data.count], data.ypos[data.count], data.yaw[data.count], data.worldmap.shape[0], 10)
+    
+    # 6) Update worldmap (to be displayed on right side of screen)
+    
+    data.worldmap[obstacle_y_world, obstacle_x_world, 0] =255
+    data.worldmap[rock_y_world, rock_x_world, 1] = 255
+    data.worldmap[navigable_y_world, navigable_x_world, 2] = 255
+    
+    nav_pix = data.worldmap[:, :, 2]>0
+    data.worldmap[nav_pix,0]=0
+    
+    obstacle_pix = data.worldmap[:, :, 1]>0
+    data.worldmap[obstacle_pix,0]=0
 
-#### Create function to request PickPlace service
-This function has the purpose of providing instructions to the PR2 Robot to pick objects in the Test World, which are included on the pick list, and placing them in the correct basket as specified in the pick list.
-  1. Read in parameters from ROS - __object_list__ and __dropbox__
-  2. Parse parameters in to individual variables using list comprehension
-  3. Loop through list of detected objects and compute centroid of object (pick_pose)
-  4. Determine which arm picks each object based on which basket it must be placed in (arm_name)
-  5. Determine location where object must be placed (place_pose)
-  6. Assign test world value to test scene variable (test_scene_num)
-  7. Make yaml dictionaries to be appended to the list of yaml dictionaries (dict_list)
-  8. Output yaml summary files
-  9. Repeat for other Test Worlds
+    # 7) Make a mosaic image, below is some example code
+        # First create a blank image (can be whatever shape you like)
+    output_image = np.zeros((img.shape[0] + data.worldmap.shape[0], img.shape[1]*2, 3))
+        # Next you can populate regions of the image with various output
+        # Here I'm putting the original image in the upper left hand corner
+    output_image[0:img.shape[0], 0:img.shape[1]] = img
 
-### Discussion
+        # Let's create more images to add to the mosaic, first a warped image
+    warped, mask = perspect_transform(img, source, destination)
+        # Add the warped image in the upper right hand corner
+    output_image[0:img.shape[0], img.shape[1]:] = warped
 
-The key observations I made while undertaking this project were:
-  - to effectively filter the point clouds for the objects it was necessary to have filters in all three orthogonal axes
-  - RANSAC plane filtering doesn't appear to be a significant inclusion. I've included it as it was in the exercises but after experimenting I didn't find that changing the filtering parameters made a difference. This may be because my passthrough filters already excluded the table
-  - list comprehension methods were an effective way to parse the test world parameters in to individual variables
-  - I'd like to have found a way to extract the test world number from the launch file for automatic population of the test_scene_num variable
-  - yaml dictionaries have specific data types they can accept and if there is a mismatch then the code fails
-  - implementing the PickPlace service worked in that the robot was able to move to the locations of the objects but was not however always successful at gripping the object. In case where the object was successfully gripped then the robot was able to place the object in the correct basket
-  - throughout this project I learned how to use the git functions through the Linux command line so that I could clone, commit and push changes directly without having to use Google Chrome or similar
+        # Overlay worldmap with ground truth map
+    map_add = cv2.addWeighted(data.worldmap, 1, data.ground_truth, 0.5, 0)
+        # Flip map overlay so y-axis points upward and add to output_image 
+    output_image[img.shape[0]:, 0:data.worldmap.shape[1]] = np.flipud(map_add)
+
+
+        # Then putting some text over the image
+    cv2.putText(output_image,"Analysis of video!", (20, 20), 
+                cv2.FONT_HERSHEY_COMPLEX, 0.4, (255, 255, 255), 1)
+    if data.count < len(data.images) - 1:
+        data.count += 1 # Keep track of the index in the Databucket()
+    
+    return output_image
+
+
+#out = process_image(grid_img)
+#out.tobytes()
+
+
+```
+
+### Autonomous Navigation and Mapping
+
+#### 1. Fill in the `perception_step()` (at the bottom of the `perception.py` script) and `decision_step()` (in `decision.py`) functions in the autonomous mapping scripts and an explanation is provided in the writeup of how and why these functions were modified as they were.
+
+## perception.py
+We combined th analysis done on the python notebook to create the perception steps.
+Key things needed were a thresholded image of the path, obstacles, and rocks.
+After which we pass this on to the rover to be aware of what each pixel means.
+These pixels were then converted into world map coordinates and also given different colors.
+We also calculate the polar coordinates of the navigable path to tell the rover what direction to move given the angles of the navigable terrain.
+
+To improve fidelity I took note of Rover.pitch and Rover.roll that were they were greater than or equal to  0.5 the worldmap should not be updated. This would take care of cases where the rover was doing some heavy turns and its image would not be the best quality.
+
+```
+def path(img, rgb_thresh=(160, 160, 160)):
+    # Create an array of zeros same xy size as img, but single channel
+    color_select = np.zeros_like(img[:,:,0])
+    # Require that each pixel be above all three threshold values in RGB
+    # above_thresh will now contain a boolean array with "True"
+    # where threshold was met
+    above_thresh = (img[:,:,0] > rgb_thresh[0]) \
+                & (img[:,:,1] > rgb_thresh[1]) \
+                & (img[:,:,2] > rgb_thresh[2])
+    # Index the array of zeros with the boolean array and set to 1
+    color_select[above_thresh] = 1
+    # Return the binary image
+    return color_select
+
+def obstacles(img, rgb_thresh=(160, 160, 160)):
+    color_select = np.zeros_like(img[:,:,0])
+    below_thresh = (img[:,:,0] < rgb_thresh[0]) \
+                & (img[:,:,1] < rgb_thresh[1]) \
+                & (img[:,:,2] < rgb_thresh[2])
+    color_select[below_thresh]=1
+    return color_select
+
+def rock_samples(img):
+    color_select = np.zeros_like(img[:,:,0])
+    rock_thresh = (img[:,:,0] >= 140) & (img[:,:,0] <= 187) \
+                & (img[:,:,1] >= 108) & (img[:,:,1] <= 145)\
+                & (img[:,:,2] >= 0) & (img[:,:,2] <= 20)
+    color_select[rock_thresh]=1
+    return color_select
+    
+
+# Apply the above functions in succession and update the Rover state accordingly
+def perception_step(Rover):
+    # Perform perception steps to update Rover()
+    # TODO: 
+    # NOTE: camera image is coming to you in Rover.img
+    # 1) Define source and destination points for perspective transform
+    img = Rover.img
+
   
-Future improvements:
-  - Within the Pose() data types it is possible to assign object orientation. This is a significant area for improvement as it would enable the robot end effectors to orientate more accurately to be able to pick the objects
-  - The code currently only places 
-  - Implement PR2 motion and collision mapping
-  - Undertake the challenge
+    src = get_source_coords_ref()
+    dest = get_destination_coord_ref(img)
+    
+    # 2) Apply perspective transform
+    warped, mask = perspect_transform(img, src, dest)
+    # 3) Apply color threshold to identify navigable terrain/obstacles/rock samples
+    
+    rock_thresh = rock_samples(warped)
+    obstacles_thresh = obstacles(warped)
+    path_thresh = path(warped)
+    
+    # 4) Update Rover.vision_image (this will be displayed on left side of screen)
+    Rover.vision_image[:,:,0] = obstacles_thresh*255
+    Rover.vision_image[:,:,1] = rock_thresh*255
+    Rover.vision_image[:,:,2] = path_thresh*255
 
+    # 5) Convert map image pixel values to rover-centric coords
+    path_x, path_y = rover_coords(path_thresh)
+    obs_x, obs_y = rover_coords(obstacles_thresh)
+    rock_x, rock_y = rover_coords(rock_thresh)
+    
+    # 6) Convert rover-centric pixel values to world coordinates
+    navigable_x_world, navigable_y_world= pix_to_world(path_x, path_y, Rover.pos[0], Rover.pos[1], Rover.yaw, Rover.worldmap.shape[0], 10)
+    obstacle_x_world, obstacle_y_world= pix_to_world(obs_x, obs_y, Rover.pos[0],  Rover.pos[1], Rover.yaw, Rover.worldmap.shape[0], 10)
+    rock_x_world, rock_y_world= pix_to_world(rock_x, rock_y, Rover.pos[0], Rover.pos[1], Rover.yaw, Rover.worldmap.shape[0], 10)
+    
+    # 7) Update Rover worldmap (to be displayed on right side of screen)
+    if Rover.pitch<0.5 and  Rover.roll<0.5:                
+        Rover.worldmap[obstacle_y_world, obstacle_x_world, 0] =255
+        Rover.worldmap[rock_y_world, rock_x_world, 1] = 255
+        Rover.worldmap[navigable_y_world, navigable_x_world, 2] = 255
+    
+    nav_pix = Rover.worldmap[:, :, 2]>0
+    Rover.worldmap[nav_pix,0]=0
+    
+    rock_pix = Rover.worldmap[:, :, 1]>0
+    Rover.worldmap[rock_pix,0]=0
+    
+    
+
+    # 8) Convert rover-centric pixel positions to polar coordinates
+    # Update Rover pixel distances and angles
+    
+    dist, angles = to_polar_coords(path_x,path_y)
+    Rover.nav_dists = dist
+    Rover.nav_angles = angles
+    
+    
+    return Rover
+```
+
+## decision.py
+Here I modularized the code to get a better understanding of what each step was doing.
+We have two modes.
+Rover could be stopped or moving forward.
+For forward, where there was sufficient terrain, we would continue to move and adjust the steering angle using the mean navigable path polar coordinate angle previously given in the perception step. When navigable terrain is below threshold, we would stop and perform a continous turn to the right until the vision was enough to "go forward". Once able we update the rover state to forward and continue. 
+```
+
+def move_forward(Rover):
+    # Set throttle back to stored value
+    Rover.throttle = Rover.throttle_set
+    # Release the brake
+    Rover.brake = 0
+    # Set steer to mean angle
+    Rover.steer = np.clip(np.mean(Rover.nav_angles * 180/np.pi), -15, 15)
+    Rover.mode = 'forward' 
+
+def brake(Rover):
+    Rover.throttle = 0
+    Rover.brake = Rover.brake_set
+    Rover.steer = 0
+
+def decision_step(Rover):
+
+    if Rover.nav_angles is not None:
+        # Check for Rover.mode status
+        if Rover.mode == 'forward': 
+            # Check the extent of navigable terrain
+            if len(Rover.nav_angles) >= Rover.stop_forward:  
+                # If mode is forward, navigable terrain looks good 
+                # and velocity is below max, then throttle 
+                if Rover.vel < Rover.max_vel:
+                    # Set throttle value to throttle setting
+                    Rover.throttle = Rover.throttle_set
+                else: # Else coast
+                    Rover.throttle = 0
+                Rover.brake = 0
+                
+                # Set steering to average angle clipped to the range +/- 15
+                Rover.steer = np.clip(np.mean(Rover.nav_angles * 180/np.pi), -15, 15)
+
+                    # If there's a lack of navigable terrain pixels then go to 'stop' mode
+            elif len(Rover.nav_angles) < Rover.stop_forward:
+                    # Set mode to "stop" and hit the brakes!
+                    Rover.throttle = 0
+                    # Set brake to stored brake value
+                    Rover.brake = Rover.brake_set
+                    Rover.steer = 0
+                    Rover.mode = 'stop'
+
+        # If we're already in "stop" mode then make different decisions
+        elif Rover.mode == 'stop':
+            # If we're in stop mode but still moving keep braking
+            if Rover.vel > 0.2:
+                brake(Rover)
+                
+            # If we're not moving (vel < 0.2) then do something else
+            elif Rover.vel <= 0.2:
+                # Now we're stopped and we have vision data to see if there's a path forward
+                if len(Rover.nav_angles) < Rover.go_forward:
+                    Rover.throttle = 0
+                    # Release the brake to allow turning
+                    Rover.brake = 0
+                    # Turn range is +/- 15 degrees, when stopped the next line will induce 4-wheel turning
+                    Rover.steer = -15 
+                        
+                # If we're stopped but see sufficient navigable terrain in front then go!
+                if len(Rover.nav_angles) >= Rover.go_forward:
+                    move_forward(Rover)
+                    Rover.mode='forward'
+                   
+    # Just to make the rover do something 
+    # even if no modifications have been made to the code
+    else:
+        Rover.throttle = Rover.throttle_set
+        Rover.steer = 0
+        Rover.brake = 0
+        
+    # If in a state where want to pickup a rock send pickup command
+    if Rover.near_sample and Rover.vel == 0 and not Rover.picking_up:
+        Rover.send_pickup = True
+    
+    return Rover
+
+```   
+  
+
+
+
+
+#### 2. Launching in autonomous mode your rover can navigate and map autonomously.  Explain your results and how you might improve them in your writeup.  
+
+**Note: running the simulator with different choices of resolution and graphics quality may produce different results, particularly on different machines!  Make a note of your simulator settings (resolution and graphics quality set on launch) and frames per second (FPS output to terminal by `drive_rover.py`) in your writeup when you submit the project so your reviewer can reproduce your results.**
+
+As mentioned, I was able to adjust the world map based on roll and pitch angles to improve fidelity.
+
+```
+   if Rover.pitch<0.5 and  Rover.roll<0.5:                
+        Rover.worldmap[obstacle_y_world, obstacle_x_world, 0] =255
+        Rover.worldmap[rock_y_world, rock_x_world, 1] = 255
+        Rover.worldmap[navigable_y_world, navigable_x_world, 2] = 255
+
+```
+
+
+Going forward I would have loved to understand how to manipulate the nav angles to make my rover biased to the left wall.
+I tried some things like making the Rover.steer=-15 and only adjust to normal steer ( mean navigable angle) when navigable pixels below 250 but greater than 50. But the Rover behaviour was worse than my final solution :) . A really interesting problem and would definitely like to learn how other students accomplish that. :).
+
+Configurations: OS- Mac; Screen Res- 840 x 524; Graphics Quality - Good; fps was same as default (I see None in drive_rover.py)
+
+I was able to map 57.5% of the environment at 84.8 percent fidelity
+
+
+![alt tag](https://github.com/fola95/Udacity-Rover-Project/blob/master/code/graphs/autonomousShot.png)
 
 
