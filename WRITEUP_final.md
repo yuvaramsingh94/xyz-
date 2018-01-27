@@ -1,177 +1,173 @@
-# Project: Perception Pick & Place
+# Project: Follow Me
 
 ---
 
-## [Rubric](https://review.udacity.com/#!/rubrics/1067/view) Points
-Here I will consider the rubric points individually and describe how I addressed each point in my implementation.  
+## [Rubric](https://review.udacity.com/#!/rubrics/1155/view) Points
 
 Note: I have been helped through the Udacity Slack.
 
 ---
 
-### Writeup / README
+## Introduction
+The Follow Me project consists in making a UAV able to follow a *specific* human.
+To achieve this goal, we build and train a fully convolutional network (FCN).
 
-#### 1. Provide a Writeup / README that includes all the rubric points and how you addressed each one.  You can submit your writeup as markdown or pdf.  
+## Fully Convolutional Network (FCN)
 
-You're reading it!
-
-As asked in the review, I have improved my writeup with:
-- detailed explanation
-- code snippets
-- discussion about results
-- problems faced with their solution
-
-
-### Exercise 1, 2 and 3 pipeline implemented
-#### 1. Complete Exercise 1 steps. Pipeline for filtering and RANSAC plane fitting implemented.
-
-The pipeline has been correctly implemented, as reviewed.
-
-To avoid the camera noise problems, a filtering is applied. The values are chosen by tries and results observation (publishing an intermediate "debug_cloud").
-
+### Encoders
+First, the RGB image is taken to encoders.
 ```python
-## Statistical Outlier Filtering
-outlier_filter = cloud.make_statistical_outlier_filter()
-
-# Set the number of neighboring points to analyze for any given point
-outlier_filter.set_mean_k(50)
-
-# Set threshold scale factor
-x = 0.5
-
-# Any point with a mean distance larger than global (mean distance+x*std_dev) will be considered outlier
-outlier_filter.set_std_dev_mul_thresh(x)
-
-# Finally call the filter function for magic
-cloud_filtered = outlier_filter.filter()
+encoder1 = encoder_block(inputs, filters=128, strides=2)
+encoder2 = encoder_block(encoder1, filters=64, strides=2)
+encoder3  = encoder_block(encoder2, filters=32, strides=2)
 ```
 
-Similarly, a Downsampling filter is applied, with values chosen by tries and observations in the camera results. Too small leaf size means too much details (heavy) and too big means too simplistic (not performant), as in the course exercise.
+The encoder role is to extract features from the image.
+The filters number is the depth of the output of each encoder (The input RGB image, having three colors channel, is of depth 3).
+The strides number is the dimension divider of the encoder. With strides=2, the encoder output dimensions will be half of the encoder input dimensions.
+
+### Decoders
+Symmetrically, to the encoders, we put decoders.
 ```python
-# Voxel Grid Downsampling
-vox = cloud_filtered.make_voxel_grid_filter()
-LEAF_SIZE = 0.01
-vox.set_leaf_size(LEAF_SIZE, LEAF_SIZE, LEAF_SIZE)
-cloud_filtered = vox.filter()
-```
-Similarly, a PassThrough filter is applied. Values are also chosen by tries and observation of an intermediate debug_cloud in the visualisation.
-```python
-# PassThrough Filter
-passthrough = cloud_filtered.make_passthrough_filter()
-passthrough.set_filter_field_name('z')
-passthrough.set_filter_limits(0.6, 1.3)
-cloud_filtered = passthrough.filter()
-
-passthrough2 = cloud_filtered.make_passthrough_filter()
-passthrough2.set_filter_field_name('y')
-passthrough2.set_filter_limits(-0.4, 0.4)
-cloud_filtered = passthrough2.filter()
-
-passthrough3 = cloud_filtered.make_passthrough_filter()
-passthrough3.set_filter_field_name('x')
-passthrough3.set_filter_limits(0.4, 0.9)
-cloud_filtered = passthrough3.filter()
-
+decoder3 = decoder_block(convolution1x1, large_ip_layer=encoder2, filters=32)
+decoder2 = decoder_block(decoder3, large_ip_layer=encoder1, filters=64)
+decoder1  = decoder_block(decoder2, large_ip_layer=inputs, filters=128)
 ```
 
-Finally, a RANSAC Plane Segmentation is done to distinguish the points on a plane called inliers (the table), and the others called outliers, as in the course.
+The decoder role is to upscale the output of encoders (features) to the same size as the original image. That is why there is one decoder linked to each encoder, mirroring the same filter parameter.
+
+### 1x1 Convolution layer
+As explained in the course, we put a 1x1 convolution layer between the encoders and decoders.
+The idea is to increase the depth by adding this "mini neural network" working over the patch. The good thing is, being a 1x1 convolution layer, the computing cost is low (mathematically, it is matrix multiplications).
+Therefore, it offers more deepness for a cheap computive cost.
+
+### Mixed up filter depth
+The course lecture video on Fully Convolutional Network (https://classroom.udacity.com/nanodegrees/nd209/parts/c199593e-1e9a-4830-8e29-2c86f70f489e/modules/cac27683-d5f4-40b4-82ce-d708de8f5373/lessons/032b020f-7c02-46dc-9266-eaee3eb76eb7/concepts/e5e4584d-c31a-4a1c-aa36-1ff06c608956#) shows, in that order:
+- decreasing depth convolutional layers
+- increasing depth convolutional layers
+- the global resulting scheme
+
+This order in explanation initially misled me in thinking that the first part (therefore encoder) was the decreasing depth, and the lst part (therefore decoder) was the increasing depth, whereas it is the opposite.
+
+Fortunately, it still provided good results; although re-ordering the depth and training on an expensive cloud again might led to better results at the end
+
+### Skip connections
+As explained in the skip connections video course (https://classroom.udacity.com/nanodegrees/nd209/parts/c199593e-1e9a-4830-8e29-2c86f70f489e/modules/cac27683-d5f4-40b4-82ce-d708de8f5373/lessons/032b020f-7c02-46dc-9266-eaee3eb76eb7/concepts/30527098-b8b0-419a-821b-da4473f39a72#), the encoder focus on small patch of images and lose the big picture, which implies that the segmentation will be messy/blurry, not very precise. Skipping connections (performed thanks to encoder-decoder linking) allows to counter that effect by combining the two layers by addition.
+
+![Putty](Skip.PNG)
+
+### Why a FCN ?
+The FCN is widely used for semantic segmentation (looking at the image and being able to distinguish/identify each object in the scene).
+
+Using a Fully CONNECTED Network would not be good: as said in the lecture, it could "recognize a hot dog, but not a hot dog in a plate". Here, the hero would not be correctly recognized in the scene.
+
+Using a classic convolution layer would not allow to recognize correctly the hero at different distances: the hero would be of different sizes and therefore not recognized (no skipping).
+
+![Putty](FCN.PNG)
+
+## Learning Parameters Understanding (first idea)
+
+We explained above the FCN parameters.
+How about the meaning of the Learning parameters ?
+
+The learning rate is the size of the jump/steps:
+- Smaller learning rate
+  - :-) More precise/stable
+  - :-( Much longer computation
+
+The batch size (number of images processed per batch):
+- Too big batch size
+  - :-( GPU fail (out of memory?)
+
+The number of epochs is the number of iterations:
+- More epochs
+  - :-) Accuracy Improvements
+  - :-( (Linearly?) longer computation
+
+The number of stepsper epoch is the number of changes per epoch (closely linked to the learning rate):
+- More steps
+  - :-) Accuracy Improvements
+  - :-) (Linearly?) longer computation
+Note: in the course, it is recommended to use the number of images divided by the batch size
+
+The number of workers is linked to the number of cores in the CPU.
+
+Therefore, based on the course and the above understanding:
 
 ```python
-# RANSAC Plane Segmentation
-seg = cloud_filtered.make_segmenter()
-seg.set_model_type(pcl.SACMODEL_PLANE)
-seg.set_method_type(pcl.SAC_RANSAC)
-max_distance = 0.01
-seg.set_distance_threshold(max_distance)
-inliers, coefficients = seg.segment()
-
-# Extract inliers and outliers
-extracted_inliers = cloud_filtered.extract(inliers, negative=False)
-extracted_outliers = cloud_filtered.extract(inliers, negative=True)
+learning_rate = 0.001
+batch_size = 32
+num_epochs = 200
+steps_per_epoch = 4131 / batch_size
+validation_steps = 1184 / batch_size
+workers = 2
 ```
 
+## Testing local
+Before throwing away money into Cloud infrastructure for a non working script, I first tested my code with a 0.01 learning_rate and 5 epochs only on my old laptop. After some debug (mostly pip install libraries) and a night of computation, I got low result but the assurance that the script was working.
+I therefore tested on Amazon Cloud.
 
-#### 2. Complete Exercise 2 steps: Pipeline including clustering for segmentation implemented.  
+## Testing on cloud
+After following the GPU Cloud instructions on the course, I connected with converted private key and Putty to:
+```
+ubuntu@ec2-34-245-36-199.eu-west-1.compute.amazonaws.com
+Port 22
+```
+![Putty](putty1.PNG)
+![Putty](putty2.PNG)
 
-The pipeline has been correctly implemented, as reviewed.
-
-First of all, we ignore the colors to focus on position, which is what delimits points clouds of each object separately.
+After a few trials, my best parameters were:
 ```python
-# Euclidean Clustering
-white_cloud = XYZRGB_to_XYZ(extracted_outliers)
+learning_rate = 0.001
+batch_size = 32
+num_epochs = 200
+steps_per_epoch = 4131 / batch_size
+validation_steps = 1184 / batch_size
+workers = 2
 ```
 
-Then, the clustering is applied as in Exercise. The values were tested by test and tries. Understanding the parameters help to choose them correctly:
-- ClusterTolerance: define the distance tolerated ("how far") between two points to consider it is still in the same group
-- MinClusterSize: smallest cluster possible (too small: too many clusters are found, too big: objects are not recognized individually)
-- MaxClusterSize: biggest cluster possible (too small: objects are too big, therefore rejected, too big: two objects can merge in one cluster)
+## Results discussion, future enhancements
 
+I achieved a score of:
 ```python
-tree = white_cloud.make_kdtree()
-# Create Cluster-Mask Point Cloud to visualize each cluster separately
-# Create a cluster extraction object
-ec = white_cloud.make_EuclideanClusterExtraction()
-# Set tolerances for distance threshold
-# as well as minimum and maximum cluster size (in points)
-# NOTE: These are poor choices of clustering parameters
-# Your task is to experiment and find values that work for segmenting objects.
-ec.set_ClusterTolerance(0.01)
-ec.set_MinClusterSize(200)
-ec.set_MaxClusterSize(15000)
-# Search the k-d tree for clusters
-ec.set_SearchMethod(tree)
-```
-#### 3. Complete Exercise 3 Steps.  Features extracted and SVM trained.  Object recognition implemented.
-The pipelines have been correctly implemented, as reviewed (capture_features, features and train_svm.py).
-
-For capture_features:
-- I faced a problem that depending on the object apparition angles, some were not recognized, and relaunching made them recognizable but other would not. By increasing the number of iterations to 50, this problem disappear (all faces appear at least at some iterations)
-- Object list was updated considering the scene objects in the world files.
-
-For features:
-- A color and a normal histograms are used, as in the course.
-
-To train the SVM, I did:
-`roslaunch sensor_stick training.launch` (launch the scene) followed by `rosrun sensor_stick capture_features.py` (launch the objects features capturing by generating objects at different angles in front of the camera) and after `rosrun sensor_stick train_svm.py` to train the SVM.
-
-A confusion matrix is generated.
-![Confusion Matrix](confusion.png)
-The left one (absolute number) is not very relevant as they were as many iterations of each object. (Otherwise, percentage-view would hide the fact that some object would appear only once contrary to other thousands of time, which would bias the model towards the second one. It is not the case here as there are as many iterations of each object).
-The right one (relative values, percentage if multiplied by 100) is easier to read and independent of the iterations number. The ideal case is to have 100% in all the diagonal, as the diagonal are the "Good object conclusions" ones (although 100% would probably be overfitting, which is partially avoided by cross-validation).
-
-### Pick and Place Setup
-
-#### 1. For all three tabletop setups (`test*.world`), perform object recognition, then read in respective pick list (`pick_list_*.yaml`). Next construct the messages that would comprise a valid `PickPlace` request output them to `.yaml` format. + You can add this functionality to your already existing ros node or create a new node that communicates with your perception pipeline to perform sequential object recognition. Save your PickPlace requests into output_1.yaml, output_2.yaml, and output_3.yaml for each scene respectively. Add screenshots in your writeup of output showing label markers in RViz to demonstrate your object recognition success rate in each of the three scenarios. Note: for a passing submission, your pipeline must correctly identify 100% of objects in test1.world, 80% (4/5) in test2.world and 75% (6/8) in test3.world.
-
-
-
-```python
-roslaunch pr2_robot pick_place_project.launch
-rosrun pr2_robot project.py
+# And the final grade score is
+final_score = final_IoU * weight
+print(final_score)
+0.460961615459
 ```
 
-Object detection is done thanks to the classifier predict on the clusters previously found in the scene (see previous questions).
-We loop through the clusters by `for index, pts_list in enumerate(cluster_indices):` and compute the features as for the capture_features in the previous question. Based on this, we have the known training data which have trained the model, and we use this model to classify unknown clusters with `prediction = clf.predict(scaler.transform(features.reshape(1, -1)))`.
+To go more into results, let's look at different situations
 
-The predictions are stored in the `DetectedObject` list `detected_objects` which is then sent to the `pr2_mover` function.
+---
+![Putty](epoch200.PNG)
+Looking at the training and validation curve, it seems that there is no use to go beyond 100 epochs.
 
-This function loop through the `object_list`/`detected_objects` and get the position (x-y-z means  of the point cloud). We look in the `/object_list` publication where (which dropbox) the object is supposed to go (depending on its name). Then, depending on that dropbox, we look in the `/dropbox` publication which arm should be used.
+---
+![expensive](expensive.PNG)
+I could have save some bucks on Amazon Cloud :-)
 
+---
+![expensive](follow1.PNG)
+![expensive](follow2.PNG)
+As the final score says, the results seems pretty good as the hero is correctly followed and distinguished from other people, which are correctly also correctly identified.
 
-Finally, the object and its caracteristics (arm, initial position, dropbox goal...) are made translated to Yaml with `make_yaml_dict` and appended to a yaml_dict list which is saved in a .yaml file with `send_to_yaml`.
+---
+![expensive](patrol.PNG)
+At patrol, other humans are detected but not misidentified as our hero. That's a good thing !
 
-Results:
-World 1: 100%
-World 2: 100%
-World 3: 87%
-![results world 1](w1.png)
-![results world 3](w2.png)
-![results world 3](w3.png)
+---
 
+![expensive](patroltarget.PNG)
+I was quite impressed when finding out that the UAV could recognize the hero from far away while at patrol.
 
+## Future Enhancements
+![expensive](somefail1.PNG)
+Gladly enough (I would start to be afraid), there are failures. Here above, the UAV misidentifies partly a non-hero as hero.
 
-### Improvements, general problems
-- The Extra Bonus steps suggested by the course would be interesting to implement, and will be (outside of the mandatory deadlines, though)
-- Oriented-Object Programming would be an improvement to the readability of the code
-- I have excessively annoying issues with gazebo and Rviz. I must re-launch them dozens of time before having a correct session (without error code in the Gazebo/Rviz launching)
-- The laptop ressources are very limited for this application.
+Obviously, FCN are not reserved to humans detection only. By adapting the training data to other kind of objects/animals, we could also detect dogs, cats, birds, dinosaurs, ...
+
+I could also improve my results by unmixing up my depth of enconder/decoder filters as explained in this report.
+
+Fine tuning the parameters might improve the results but I think that more training data (especially with obstacle in the view, or at different distances...) would be of a greater interest.
+
+Finally, to actually do a real-world application, we should add some stabilisation pre-processing, contrast improvements and such due to the nature of UAV (moving accross winds, etc).
