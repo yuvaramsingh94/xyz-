@@ -1,46 +1,79 @@
-## Project: Follow Me
+# Project: Perception Pick & Place
 
-[image1]: ./images/fcn_arch.png
-[image2]: ./images/graph.png
+The present repository is my solution to [Udacity Robotics Nanodegree Perception Project](https://github.com/udacity/RoboND-Perception-Project.git).
 
-### Concepts
-#### Convolutional Neural Network
-Convolutional Neural Networks (CNNs) are often used in imaging-related applications since the convolution layers emulate the way visual cortex of humans processes vision - by extracting information from local regions. By stacking convolution layers, we attempt to extract higher and higher level of information from the given image - edges/curves, then shapes, etc.. Max pooling layers (and other variations) are also used to improve performance by avoiding overfitting. While its success in image classification is renowned in visual recognition challenges, the traditional CNN architecture lacks the ability of determining positions in objects in the images. In particular, the Fully-Connected Layers, usually placed at the end of the network, remove spatial information that is essential for locating objects.
+---
 
-#### Fully Convolutional Network
-To preserve spatial information, as well as to keep the non-linearity of the network, we can replace the Fully-Connected Layers with 1x1 Convolution Layers. There are 2 additional advantages in doing this: one, we can feed images of any size into the resulting trained network, and two, we can easily increase and decrease the complexity of the most compact (usually) representation by varying the number of 1x1 filters.
 
-To make use of the kept spatial information, we make use of bilinear upsampling to predict pixel probabilities. This requires less overall training, as compared to traditional transpose convolutions, since the bilinear upsampling is just linear interpolations of values.
+## Required Steps for a Passing Submission:
+1. Extract features and train an SVM model on new objects (see `pick_list_*.yaml` in `/pr2_robot/config/` for the list of models you'll be trying to identify). 
+2. Write a ROS node and subscribe to `/pr2/world/points` topic. This topic contains noisy point cloud data that you must work with.
+3. Use filtering and RANSAC plane fitting to isolate the objects of interest from the rest of the scene.
+4. Apply Euclidean clustering to create separate clusters for individual items.
+5. Perform object recognition on these objects and assign them labels (markers in RViz).
+6. Calculate the centroid (average in x, y and z) of the set of points belonging to that each object.
+7. Create ROS messages containing the details of each object (name, pick_pose, etc.) and write these messages out to `.yaml` files, one for each of the 3 scenarios (`test1-3.world` in `/pr2_robot/worlds/`).  [See the example `output.yaml` for details on what the output should look like.](https://github.com/udacity/RoboND-Perception-Project/blob/master/pr2_robot/config/output.yaml)  
+8. Submit a link to your GitHub repo for the project or the Python code for your perception pipeline and your output `.yaml` files (3 `.yaml` files, one for each test world).  You must have correctly identified 100% of objects from `pick_list_1.yaml` for `test1.world`, 80% of items from `pick_list_2.yaml` for `test2.world` and 75% of items from `pick_list_3.yaml` in `test3.world`.
+9. Congratulations!  Your Done!
 
-Another powerful tweak we can make to the network is through the use of skip connections. In essence, this means combining the high-level and low-level information to make spatial predictions more robust and accurate. This is done in this project by concatenating a prior layer that has the same height and width, and then perform convolution on this resulting layer.
+## Extra Challenges: Complete the Pick & Place
+7. To create a collision map, publish a point cloud to the `/pr2/3d_map/points` topic and make sure you change the `point_cloud_topic` to `/pr2/3d_map/points` in `sensors.yaml` in the `/pr2_robot/config/` directory. This topic is read by Moveit!, which uses this point cloud input to generate a collision map, allowing the robot to plan its trajectory.  Keep in mind that later when you go to pick up an object, you must first remove it from this point cloud so it is removed from the collision map!
+8. Rotate the robot to generate collision map of table sides. This can be accomplished by publishing joint angle value(in radians) to `/pr2/world_joint_controller/command`
+9. Rotate the robot back to its original state.
+10. Create a ROS Client for the “pick_place_routine” rosservice.  In the required steps above, you already created the messages you need to use this service. Checkout the [PickPlace.srv](https://github.com/udacity/RoboND-Perception-Project/tree/master/pr2_robot/srv) file to find out what arguments you must pass to this service.
+11. If everything was done correctly, when you pass the appropriate messages to the `pick_place_routine` service, the selected arm will perform pick and place operation and display trajectory in the RViz window
+12. Place all the objects from your pick list in their respective dropoff box and you have completed the challenge!
+13. Looking for a bigger challenge?  Load up the `challenge.world` scenario and see if you can get your perception pipeline working there!
 
-#### Batch normalization
-To optimize network training, we can also make use of batch normalization, which is to normalize the input batch at each layer. This allows us to mitigate vanishing gradient to some extent, as well as provide some level of regularization.
+## [Rubric](https://review.udacity.com/#!/rubrics/1067/view) Points
+### Here I will consider the rubric points individually and describe how I addressed each point in my implementation.  
 
-#### Depthwise Separable Convolutions
-Instead of the traditional convolution layers, we can instead make use of separable convolution layers. What the layer does is to perform convolution on each of the input channels, and then apply 1x1 convolutions to the result. The advantage is that it uses less parameters which enables fast computation, both in learning and evaluation.
+---
+### Writeup / README
 
-### Hyperparameters
-Aside from deciding the complexity of the network architecture, the other important decision required for this project is the choice of hyperparameters. While attempts were made to tune the hyperparameters based on its performance as well as the loss graph, they did not help to exceed the 0.40 final score benchmark. In particular, the general idea when tuning includes:
-- When the validation loss fluctuates too much, learning rate is reduced and/or batch size is increased
-- When the validation loss towards the end is still decreasing, the number of epochs is increased
-- When the final validation loss is too big (than the usual ~0.05), or the score is too low, then # of encoder/decoder layers, # of separable convolution layers, and # of filters in each of the layers are tweaked
+#### 1. Provide a Writeup / README that includes all the rubric points and how you addressed each one.  You can submit your writeup as markdown or pdf.  
 
-With about 50 different runs of training on the AWS instance, the best result obtainable for me was at 0.3904. In the end, collection of more `patrol_with_targ` type of images and some further tuning was needed to exceed the required 0.40 threshold. Towards the end, it became more of a bruteforce of hyperparameters since they seem to have similar performance, although the graphs they produce vary significantly.
+You're reading it!
 
-### Results
-#### Model
-![FCN Architecture][image1]
+### Exercise 1, 2 and 3 pipeline implemented
+#### 1. Complete Exercise 1 steps. Pipeline for filtering and RANSAC plane fitting implemented.
 
-This is the resulting model used for training. Each decoder block included 3 layers of separable convolution to sieve out finer details from prior layers. A 1x1 convolution layer with 96 filters was found to perform well in many different trials and was thus used.
+Steps have been completed in `project_template.py`:
+- a statistical outlier filter has been added in order to remove part of the noise
+- then the space has been divided into voxels for faster processing
+- a passthrough filter has been used on z-axis and y-axis to remove the points below the table as well as the ones coming from the side boxes
+- RANSAC plane fitting has been used to isolate the tabl, which let us extract the objects on it.
 
-#### Performance
-![Training Loss Graph][image2]
+#### 2. Complete Exercise 2 steps: Pipeline including clustering for segmentation implemented.
 
-After data collection and further tuning, a score of 0.4267 was achieved.
-A total of 4892 training images were used. The final model was trained with a 0.001 learning rate, 24 epochs, batch size of 20, and steps of 250. In the decoder block, 3 separable convolution layers were used.
+Steps have been completed in `project_template.py`:
+- euclidean clustering model has been used
+- tolerances as well as target size has been refined through trial and error. The tolerance is related to the distance of the points belonging to a same cluster while the target size is used to identify the number of elements needed to form a cluster.
 
-### Segmentation for other objects
-If we were to blindly use the trained model to other objects (or even other targets...), of course, it will be unlikely to work. The most important change required is the data used for training. The model we have has been specifically trained to extract information required to identify people from the background, and the hero from the people - colour and shapes, or possibly even type of clothing, and extracting this same information for other objects may not be useful.
+#### 2. Complete Exercise 3 Steps.  Features extracted and SVM trained.  Object recognition implemented.
 
-Even then, changing of data does not ensure that our model will work for other objects. Depending on the new environment and the type of object of interest, significant changes to the complexity of the model may also be needed to learn different abstractions for identification.
+We capture the objects of interest in front of the camera in random position and orientation, and use the point cloud data to create color and normal histograms. Those are used to define the features associated with the objects.
+
+![feature extraction](images/feature_extraction.jpg)
+
+Once we have created features in different orientation for all the objects, we train a SVM classifier and ensure our features are well chosen by verifying the confusion matrix.
+
+![confusion matrix](images/confusion_matrix.png)
+
+### Pick and Place Setup
+
+#### 1. For all three tabletop setups (`test*.world`), perform object recognition, then read in respective pick list (`pick_list_*.yaml`). Next construct the messages that would comprise a valid `PickPlace` request output them to `.yaml` format.
+
+We use our classifier to identify each cluster.
+
+![identification](images/identification.png)
+
+While it is not difficult to identify 3 objects (in the test world 1), it becomes much more difficult to identify 8 objects as some are similar and not all are well positioned (for example the glue). Here are a few outlines:
+- the size of voxels need to be small enough, as well as the histogram bins, in order to have enough detail on the object color to reach a good classification
+- the more orientation samples are taken to extract the features, the better will be the accuracy of the classifier
+- noise need to be removed in order to improve predictions
+- the side bins can be recognized during clustering process and need to be filtered out
+
+The message is straightforward to construct once the voxels have been correcly identified. The object centroid can be calculated and its corresponding bin color is used to pick the correct and correct target position.
+
+The yaml messages for each test environment can be found in the folder `yaml_output`.
