@@ -1,40 +1,82 @@
+## Project: Follow Me
 
-## Project: Search and Sample Return
+---
 
-### Notebook Analysis
-#### 1. Run the functions provided in the notebook on test images (first with the test data provided, next on data you have recorded). Add/modify functions to allow for color selection of obstacles and rock samples.
+[//]: # (Image References)
 
-* Earlier parts of work was done in Lab jupyter notbook page online, so it was downloaded and used as Test one.
-* Provided functions works quite well, but personally I prefer to write generalized affine transformations instead of specialized code. 
-* HSV thresholding was added in order effectively find samples (`hsv_threshold(img, hsv_lower = (0, 0, 0), hsv_upper = (255, 255, 255))`). Initial thresholds was found by building simple one-channels histograms in both RGB and HSV spaces of provided images and trying to separate parts of multi-modal distribution. Further improvement was achieved by rendering images with mask and slowly tweaking parameters. After evaluating color thresholding on video, whole process was repeated on frames with clearly incorrect segmentation.
+[image_0]: ./misc/sim_screenshot.png
+[overview]: ./misc/overview.png
+[architecture]: ./misc/architecture.jpg
+[train_curves]: ./misc/train_curves.png
+[hero_result]: ./misc/hero_result.png
+[passenger_result1]: ./misc/passenger_result1.png
+[passenger_result2]: ./misc/passenger_result2.png
 
-#### 2. Populate the `process_image()` function with the appropriate analysis steps to map pixels identifying navigable terrain, obstacles and rock samples into a worldmap.  Run `process_image()` on your test data using the `moviepy` functions provided to create video output of your result. 
+## [Rubric](https://review.udacity.com/#!/rubrics/1155/view) Points
+### Here I will consider the rubric points individually and describe how I addressed each point in my implementation.  
 
-* In order to render video, `process_image()` function was filled with image processing steps:
-1) Warping image, in order to get rig of perspective projection
-2) Color thresholding with different thresholds in order to find pixels, corresponding to obstacles, samples and navigable terrain.
-3) Converting to rover coordinates.
-4) Converting to world coordinates and scaling.
-5) Filling worldmap with acquired data.
-6) Generating supporting images
+---
+### Writeup / README
 
-* Video was created on sample data online. And than was recreated locally in order to make sure that everything works.
+This project expores the ability of deep neural network in classifying and segmenting objects. In particular, a fully convolutional neural network has been trained and implemented to allow a drone to track and follow a `hero`. The simulating environment is taken place in a large area with buildings, trees, and another passengers.
 
-### Autonomous Navigation and Mapping
+![alt text][image_0] 
 
-#### 1. Fill in the `perception_step()` (at the bottom of the `perception.py` script) and `decision_step()` (in `decision.py`) functions in the autonomous mapping scripts and an explanation is provided in the writeup of how and why these functions were modified as they were.
+##### 1. Architecture
 
-Firstly, `perception_step()` code was mostly taken from `process_image()` and was adapted to existing framework. After evaluating resulting function in interactive environment, few flaws was found and addressed.
- 1) Simple HSV thresholding was unable to recognize navigable terrain texture in high luminosity areas. RGB thresholding was failing in shaded areas, so I had to combine both approaches.
- 2) Following tips from provided materials, pitch and roll thresholding was introduces in order not to update map with low quality data, as high pitch and roll would invalidate reverse perspective transform.
- 3) Even with named thresholding there was still to many navigable terrain false positives, so pixels with high-confidence obstacles was forced to loose respective navigable terrain value.
- 4) Point 3 was generally too harsh, so slight relaxation was added - pixels, proving themselves to be navigable, was allowed to slowly loose their obstacle rating.
- In this setup it was possible to achieve 95% mapping with 95% fidelity on manual controls.
- Also, rover-centered polar coordinates of navigable pixels was generated in order to make control decision-making possible. Named pixels was distance and angle thresholded as this method was found helpful while tuning controls in autonomous mode.
- 
- Decision-making was addressed next. Provided code was able to achieve required fidelity, but failed to achieve required mapping, as was prone to find loop in navigable terrain and follow it. So, new "follow" mode was introduced. The main idea is that rover should somehow follow obstacles, effectively implementing "always turn left" maze crawling algorithm. It was done by binding steering to a navigable pixel percentage in defined sector. Accounting all thresholds, it's just truing to keep 15% of visible navigable terrain in sector between -0.15 and -0.5 radian (thresholded by distance between 20 and 150). This mode turned on by "forward" mode when named percentage in between 10% and 20% and aborted if it leaves 5%-25% range. Also it's able to make sudden turn if suck. Also "forward" mode was augmented to try slowly turn if stuck.
+The segmentation system utilizes the fully convolutional network to assign label (background, person, hero) to each pixel of images captured from a camera installed in a drone. An overview of this network can be demonstrated in the picture below 
 
-#### 2. Launching in autonomous mode your rover can navigate and map autonomously.  Explain your results and how you might improve them in your writeup.  
- I was able to run described setup and record a run with external screen capture program. It was able to achieve declared (40% mapping, 60% fidelity) metric just under 78 seconds. Full run was aborted on second 389 with 96.1% mapped and 73.9% fidelity as rover stuck. All 6 rocks was located. None of the rocks was picked up.  Rover was unable to return to the starting point. Video of that run included in submission.
- With a little bit better parameter tuning rower would be able to not stuck and make full maze crawl, presumably improving mapping. Special "approach sample" state would make possible to collect located samples and more or less complete NASA challenge. Additional "return home" state would ensure success. Time is also subject of improvement here. Carefully tuned max speed, "follow" turn ratio and other thresholds could greatly improve mapping time. Also ability to skip confidently mapped parts on high speed would help significantly, as maze crawling involves lots of backtracking.  Using actual ML classifiers to determine navigable terrain and obstacles would also help a lot.
+![alt text][architecture]
+
+* ##### Fully Convolutional Network
+
+A fully convolutional network combines two main blocks which are the Encoders and Decoders. Each encoder layer is a separable convolution which reduces the size of images and enriches the depth of the output. For the encoder block, transposed covolution layers are used to upsample the output. At the end of the network, a classifing layer is used to label the pixel.
+
+* ##### Separable convolutions with 1x1 convolution
+
+A separable convolution comprises a normal convolution following a 1x1 convolution. It reduces the number of parameters which not only improves calculation performance but also reduces the overfitting.
+
+* ##### Batch Normaliation
+
+Each separable convolution layer comes with a Batch Normalization. This additional way attempts to normalize the inputs to layers in a network which results in a higher learning rates and introducing a bit of regularization by adding a litte noise to the network. Input normalization has a similar effect as a Dropout or Skip Connection.
+
+* ##### Fully connected layer vs 1x1 convolution
+
+A fully connected layer is the final step to map all the result coming from convolution layers and reasoning it which is essential to classify the output. A 1x1 convolution, in addition, is a technique to manipulate the dimentionality with fewer parameters and, therefore, faster computation and reduce overfitting. A 1x1 convolution is mathematically equivalent to a fully connected layer, and therefore, can substitute fully connected layers in the network. Finally, an 1x1 convolution introduces new parameters and new non-linearity into the network so it can also improve the accuracy. 
+
+* ##### Transposed Convolutions
+
+Transposed convolution is a way of upsampling layers to higher dimentions or resolutions. In this project, Bilinear Upsampling or Bilinear Interpolation is implemented.
+
+* ##### Skip Connection
+
+Each decoder layer comprises a transposed convolution and a skip connection. In this project, Layer Concatenation technique is used to concatenate the upsampled layer and a layer with the more spatial information layer to retain the finer details.
+
+#### 2. Hyper parameters
+
+`Epoch` needs to be enough in order to let the accuracy to converged.
+`Learning Rate` a smaller learning rate (from `0.01` to `0.005`) shows a higher accuracy with an unsignificantly slower convergence.
+`Batch size` a sufficient batch size is crucial. Depend on the architure of the network, I found increasing batch size ( from `50` to `70`)overally improve the accuracy, however, larger size than that will not yield prominent diffrence and may exhaust the machine.
+
+#### 3. Results
+
+The training curves is presented below. According to the graph, it is clear that both train loss and validation loss improve together which also indicated that the model is not overfitting.
+
+![alt text][train_curves]
+
+Comparing the prediction with ground truth labels and original images, it confirms that the current model can classify the hero well when she is close. However, the numbel of misclassified pixels increases when the size of hero reduces which can be origininated as a result of network's architecture.  
+
+![alt text][hero_result]
+
+In addition, model accuracy reduces significantly when passengers wear clothes similar to the background.
+
+![alt text][passenger_result1]
+![alt text][passenger_result2]
+
+#### 4. Future Enhancements
+
+More encoder/decoder layers can be added to increase tracking accuracy when the hero is far from the drone. 
+
+This model needs to be re-trained with another objects such as dog, cat, car, ... (increase the number of classes) in order to let it work well in tracking different type of objects. This process will also require adding more samples.
+
 
