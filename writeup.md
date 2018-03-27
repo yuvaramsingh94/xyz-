@@ -1,82 +1,86 @@
-## Project: Follow Me
 
----
+# Project: Perception Pick & Place
 
-[//]: # (Image References)
+## Exercise 1, 2 and 3 Pipeline Implemented
 
-[image_0]: ./misc/sim_screenshot.png
-[overview]: ./misc/overview.png
-[architecture]: ./misc/architecture.jpg
-[train_curves]: ./misc/train_curves.png
-[hero_result]: ./misc/hero_result.png
-[passenger_result1]: ./misc/passenger_result1.png
-[passenger_result2]: ./misc/passenger_result2.png
+### Complete Exercise 1 steps. Pipeline for filtering and RANSAC plane fitting implemented.
 
-## [Rubric](https://review.udacity.com/#!/rubrics/1155/view) Points
-### Here I will consider the rubric points individually and describe how I addressed each point in my implementation.  
-
----
-### Writeup / README
-
-This project expores the ability of deep neural network in classifying and segmenting objects. In particular, a fully convolutional neural network has been trained and implemented to allow a drone to track and follow a `hero`. The simulating environment is taken place in a large area with buildings, trees, and another passengers.
-
-![alt text][image_0] 
-
-##### 1. Architecture
-
-The segmentation system utilizes the fully convolutional network to assign label (background, person, hero) to each pixel of images captured from a camera installed in a drone. An overview of this network can be demonstrated in the picture below 
-
-![alt text][architecture]
-
-* ##### Fully Convolutional Network
-
-A fully convolutional network combines two main blocks which are the Encoders and Decoders. Each encoder layer is a separable convolution which reduces the size of images and enriches the depth of the output. For the encoder block, transposed covolution layers are used to upsample the output. At the end of the network, a classifing layer is used to label the pixel.
-
-* ##### Separable convolutions with 1x1 convolution
-
-A separable convolution comprises a normal convolution following a 1x1 convolution. It reduces the number of parameters which not only improves calculation performance but also reduces the overfitting.
-
-* ##### Batch Normaliation
-
-Each separable convolution layer comes with a Batch Normalization. This additional way attempts to normalize the inputs to layers in a network which results in a higher learning rates and introducing a bit of regularization by adding a litte noise to the network. Input normalization has a similar effect as a Dropout or Skip Connection.
-
-* ##### Fully connected layer vs 1x1 convolution
-
-A fully connected layer is the final step to map all the result coming from convolution layers and reasoning it which is essential to classify the output. A 1x1 convolution, in addition, is a technique to manipulate the dimentionality with fewer parameters and, therefore, faster computation and reduce overfitting. A 1x1 convolution is mathematically equivalent to a fully connected layer, and therefore, can substitute fully connected layers in the network. Finally, an 1x1 convolution introduces new parameters and new non-linearity into the network so it can also improve the accuracy. 
-
-* ##### Transposed Convolutions
-
-Transposed convolution is a way of upsampling layers to higher dimentions or resolutions. In this project, Bilinear Upsampling or Bilinear Interpolation is implemented.
-
-* ##### Skip Connection
-
-Each decoder layer comprises a transposed convolution and a skip connection. In this project, Layer Concatenation technique is used to concatenate the upsampled layer and a layer with the more spatial information layer to retain the finer details.
-
-#### 2. Hyper parameters
-
-`Epoch` needs to be enough in order to let the accuracy to converged.
-`Learning Rate` a smaller learning rate (from `0.01` to `0.005`) shows a higher accuracy with an unsignificantly slower convergence.
-`Batch size` a sufficient batch size is crucial. Depend on the architure of the network, I found increasing batch size ( from `50` to `70`)overally improve the accuracy, however, larger size than that will not yield prominent diffrence and may exhaust the machine.
-
-#### 3. Results
-
-The training curves is presented below. According to the graph, it is clear that both train loss and validation loss improve together which also indicated that the model is not overfitting.
-
-![alt text][train_curves]
-
-Comparing the prediction with ground truth labels and original images, it confirms that the current model can classify the hero well when she is close. However, the numbel of misclassified pixels increases when the size of hero reduces which can be origininated as a result of network's architecture.  
-
-![alt text][hero_result]
-
-In addition, model accuracy reduces significantly when passengers wear clothes similar to the background.
-
-![alt text][passenger_result1]
-![alt text][passenger_result2]
-
-#### 4. Future Enhancements
-
-More encoder/decoder layers can be added to increase tracking accuracy when the hero is far from the drone. 
-
-This model needs to be re-trained with another objects such as dog, cat, car, ... (increase the number of classes) in order to let it work well in tracking different type of objects. This process will also require adding more samples.
+#### Point-cloud data is collected from the robots RGB-D camera and first filtered to remove data outliers with the use of a nearest-neighbour, standard deviation filter.
+![avatar](http://s12.sinaimg.cn/large/0034PgD7zy7jcI9yOvhdb&690)
+#### After  Voxel Grid Downsampling, take in the cloud into a passthrough through Z axis(what's more, i can also use X or Y axis, and that's what  I did in the project).
+![avatar](http://s10.sinaimg.cn/large/0034PgD7zy7jcHhsWxP69&690)
+![avatar](http://s10.sinaimg.cn/large/0034PgD7zy7jcHhsWxP69&690)
+![avatar](http://s5.sinaimg.cn/large/0034PgD7zy7jcHhvUiMa4&690)
+####  RANSAC is an algorithm, that you can use to identify points in your dataset that belong to a particular model.Here the inliers is table and the outliers is all other objects. 
+![avatar](http://s10.sinaimg.cn/large/0034PgD7zy7jcHhsWxP69&690)
 
 
+#### Output of Voxel Grid data point clouds:
+![avatar](http://s16.sinaimg.cn/large/0034PgD7zy7jcIjQD0P5f&690)
+
+
+#### Output of Table point clouds:
+![avatar](http://s16.sinaimg.cn/large/0034PgD7zy7jcIkvThZ7f&690)
+
+
+#### Output of Objects point clouds:
+![avatar](http://s7.sinaimg.cn/large/0034PgD7zy7jcIkjCho76&690)
+
+
+
+### Complete Exercise 2 steps: Pipeline including clustering for segmentation implemented.
+
+#### After the above code, Euclidean Clustering is needed to  locate and segment each cluster for classification. 
+#### Below is an example of the clustered outliers point cloud：
+![avatar](http://s15.sinaimg.cn/large/0034PgD7zy7jcIjw4PQce&690 )
+
+### Complete Exercise 3 Steps. Features extracted and SVM trained. Object recognition implemented.
+
+#### After the clusters have been located, what I need to do is to use SVM to classify the totally 6 objects whose features are already generated. 
+#### I have to point out that although in the Exercise , other complex kernels seems to performed better than linear kernel. But there's a very deadly problem: Overfitting! I tried to use rbf kernel which seems good . However, it can always misread other objects as "book". The performance in the confusion matrices, the accuracy and score are also the  way to see how the model perform. So, generally speaking, I think that linear kernel is the best in SVM.svc() function. Thanks to a friend of mine reminded me of the conclusion of Deeplearning.ai : when features are in a large amount but samples are lack, linear kernel is often better. Because in such large features, it is probably that the data are linearly separable. Although I think that rbf can also express the result of linear kernel in a way, but , as I said above, rbf is easy to overfit the data.
+#### So my SVM parameters are like this(seems so simply but it took me some times to realize that, I used rbf before and it also perform well in confusion matrices):
+
+                                           C=1.5,kernel='linear'* others are default
+#### See my previous rbf confusion matrices and score:
+![avatar](http://s8.sinaimg.cn/large/0034PgD7zy7jcIjyK4Df7&690)
+![avatar](http://s9.sinaimg.cn/large/0034PgD7zy7jcIkmD4A48&690 )
+
+
+That seems good ! But in fact, just in the test_world 1, it misrecognized to "soap" as "book"!!!!!!
+
+#### My linear confusion matrices and score:
+![avatar](http://s5.sinaimg.cn/large/0034PgD7zy7jcIjCKfG84&690 )
+![avatar](http://s4.sinaimg.cn/large/0034PgD7zy7jcIkpnLZ73&690)
+
+
+
+## Pick and Place Setup
+
+The test environment's cover three different combinations of various objects. The potential objects to be observed are:
+
+1.    biscuits
+2.    soap
+3.    soap2
+4.    book
+5.   glue
+6.    sticky_notes
+7.    snacks
+8.    eraser
+
+
+#### Screenshot of object detection in world 1:   3/3(100%)
+![avatar](http://s6.sinaimg.cn/large/0034PgD7zy7jcIkzGfPa5&690)
+
+
+#### Screenshot of object detection in world 2:   5/5(100%)
+![avatar](http://s11.sinaimg.cn/large/0034PgD7zy7jcIkMRQu4a&690)
+
+
+#### Screenshot of object detection in world 3:   8/8(100%)
+![avatar](http://s1.sinaimg.cn/large/0034PgD7zy7jcIkNgswe0&690)
+
+
+
+```python
+
+```
