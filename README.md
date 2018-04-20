@@ -15,7 +15,7 @@ i did my coding firstly on python and then Re-coded it into a C++  code . i have
 ### Code explanation 
 
 
-firstly,The code takes three consecuting frames and analyse them . it perfimance ```absdiff```
+firstly,The code takes three consecuting frames and analyse them . it perfimance ```absdiff``` which calculates the difference between frames (per element difference). this will let us know how much the image has changes . then we apply ```bitwise_and ```since  ```absdiff```function takes only two image at a time to process . 
 ```
 Mat process(Mat t0,Mat t1, Mat t2) 
 {
@@ -27,4 +27,16 @@ Mat process(Mat t0,Mat t1, Mat t2)
 }
 
 
+```
+
+we call this function from ``` countNonZero ``` function which basically returns the no of pixels whose values are greater than zero . this value directly correlate to the amount of change in the image . 
+
+``` 
+int totalDiff = countNonZero(process(t_minus, t, t_plus)); 
+```
+
+to make a video uncommand these lines 
+```
+ //VideoWriter video("out.avi",CV_FOURCC('M','J','P','G'),20, Size(640,480),true); // to write a video . 
+ //video.write(frame);
 ```
