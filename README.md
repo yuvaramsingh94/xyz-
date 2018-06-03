@@ -1,44 +1,20 @@
-### How to Run the executable 
+### Lyft perception challenge
 
-``` ./output <path to the video file > ```
+Author : yuvaram singh
+Email  : yuvaramsingh94@gmail.com
 
-eg 
+This document provides the necessary steps to run My trained model through the grader program provided by Udacity for lyft perception challenge . since i am not eligible for Lyft job interview (Not having US work permit) , i am looking to be a part of intensive career preparation seminar and other relevant job opportunities .
 
-``` ./output test_vid.mp4 ```
+### Instructions to Run 
 
-### About this code :
+* Step 1 : open up a terminal inside the workspace (change directory if you are not inside the workspace)
+* Step 2 : Run.—- `./preinstall_script.sh `
+* Step 3 : change directory into test/code.—------   `cd test/code`
+* Step 4 : Run my model through this code —- `grader 'python final_sub.py' `
 
-The main aim of this code is to determine whether the ego vehicle is moving or not based on the dashcam video . i approached this problem by finding a method to calculate the amount of change in pixel intensity which directly relates to the movement of either objects in the video or movement on the cam location .  there are lots of movable objects (other vehicles on road) which can change the background image event though the EGo vehicle is stationary . this code overcomes the problem by having a threshold value which serves as a limit to determine whether the change recorded by counting the disparity if false alarm or not . 
-
-i did my coding firstly on python and then Re-coded it into a C++  code . i have good working experience on Python so i choose that language to produce a acceptable result . then i re-coded everything in c++
-
-### Code explanation 
-
-
-firstly,The code takes three consecutive frames and analyse them . it perform ```absdiff``` which calculates the difference between frames (per element difference). this will let us know how much the image has changes . then we apply ```bitwise_and ```since  ```absdiff```function takes only two image at a time to process . 
-```
-Mat process(Mat t0,Mat t1, Mat t2) 
-{
-  Mat d1 , d2 , out;
-  absdiff(t1,t2,d1);
-  absdiff(t0,t1,d2);
-  bitwise_and(d1, d2,out);
-  return out;
-}
+### File structure
+inside the folder test , you can ﬁnd two folders namely code and model . the code folder consist of the inference code which can take in the video path as an argument , load in the model , perform inference and provide the required output . the code is designed in a way to load the correct model from the model folder . it is required to not change the folder structure since the model path inside the code is hard-coded . test —(code,model)
 
 
-```
-
-we call this function from ``` countNonZero ``` function which basically returns the no of pixels whose values are greater than zero . this value directly correlate to the amount of change in the image . 
-
-``` 
-int totalDiff = countNonZero(process(t_minus, t, t_plus)); 
-```
-
-to make a video uncommand these lines 
-```
- //VideoWriter video("out.avi",CV_FOURCC('M','J','P','G'),20, Size(640,480),true); // to write a video . 
- //video.write(frame);
-```
-
+##### Note : please see the terminal.png image to check the working of the above cmds 
 
