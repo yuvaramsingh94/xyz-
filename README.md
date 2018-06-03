@@ -5,6 +5,11 @@ Email  : yuvaramsingh94@gmail.com
 
 This document provides the necessary steps to run My trained model through the grader program provided by Udacity for lyft perception challenge . since i am not eligible for Lyft job interview (Not having US work permit) , i am looking to be a part of intensive career preparation seminar and other relevant job opportunities .
 
+
+
+[//]: # (Image References)
+[image1]: terminal.png
+
 ### Instructions to Run 
 
 * Step 1 : open up a terminal inside the workspace (change directory if you are not inside the workspace)
@@ -18,3 +23,4 @@ inside the folder test , you can ﬁnd two folders namely code and model . the c
 
 ##### Note : please see the terminal.png image to check the working of the above cmds 
 
+![alt text][image1]
